@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PP Job Pipeline</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f5;color:#111;font-size:14px}
+.hdr{background:#fff;padding:14px 20px;border-bottom:1px solid #e5e5e5;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid #e5e5e5}
+.stat{background:#f9f9f9;border-radius:8px;padding:10px 12px}
+.stat-l{font-size:11px;color:#888;margin-bottom:3px}
+.stat-n{font-size:20px;font-weight:600}
+.filters{padding:10px 16px;background:#fff;border-bottom:1px solid #e5e5e5;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pill{font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555}
+.pill.on{background:#111;color:#fff;border-color:#111}
+.srch{margin-left:auto;font-size:12px;padding:5px 10px;border:1px solid #ddd;border-radius:20px;width:140px}
+.jobs{padding:10px 16px 70px;max-width:900px;margin:0 auto}
+.card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:14px 16px;margin-bottom:10px}
+.card.sel{border:2px solid #1a7a55}
+.top{display:flex;gap:10px;align-items:flex-start}
+.cb{width:20px;height:20px;border:1.5px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.cb.on{background:#1a7a55;border-color:#1a7a55}
+.info{flex:1;min-width:0}
+.title{font-size:14px;font-weight:600;margin-bottom:3px}
+.meta{font-size:12px;color:#777;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:600;margin-left:6px}
+.b5{background:#dcf5eb;color:#0a5c38}
+.b4{background:#dbeafe;color:#1e40af}
+.b3{background:#f3f4f6;color:#555}
+.sw{color:#b45309}.so{color:#166534}
+.acts{display:flex;gap:6px;flex-shrink:0}
+.btn{font-size:12px;padding:5px 10px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;text-decoration:none;color:#111;display:inline-block}
+.grn{background:#1a7a55;color:#fff;border-color:#1a7a55}
+.reason{font-size:12px;color:#666;margin:8px 0 0 30px;line-height:1.5}
+.cmt{margin:8px 0 0 30px}
+textarea{width:100%;font-size:12px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;background:#fafafa;color:#111;resize:vertical;font-family:inherit}
+textarea:focus{outline:none;border-color:#1a7a55}
+.tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;align-items:center}
+.tl{font-size:11px;color:#888}
+.tag{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid #ddd;cursor:pointer;color:#555;background:#fff}
+.tag.bad{background:#fef2f2;color:#991b1b;border-color:#fca5a5}
+.tag.good{background:#f0fdf4;color:#166534;border-color:#86efac}
+.tag.act{font-weight:700}
+.bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e5e5;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;z-index:10}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.acts{display:none}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div><div style="font-size:16px;font-weight:600">Job pipeline</div><div style="font-size:12px;color:#888;margin-top:2px" id="meta">Loading...</div></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn" onclick="runScan()">Run scan</button>
+    <button class="btn grn" onclick="alert('WhatsApp coming next session')">Send to WhatsApp</button>
+  </div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-l">Total scanned</div><div class="stat-n" id="st0">-</div></div>
+  <div class="stat"><div class="stat-l">Shortlisted</div><div class="stat-n" id="st1">-</div></div>
+  <div class="stat"><div class="stat-l">Selected</div><div class="stat-n" id="st2">0</div></div>
+  <div class="stat"><div class="stat-l">Commented</div><div class="stat-n" id="st3">0</div></div>
+</div>
+<div class="filters">
+  <span class="pill on" data-f="all" onclick="setF(this)">All</span>
+  <span class="pill" data-f="5" onclick="setF(this)">5/5</span>
+  <span class="pill" data-f="4" onclick="setF(this)">4/5</span>
+  <span class="pill" data-f="3" onclick="setF(this)">3/5</span>
+  <span class="pill" data-f="sel" onclick="setF(this)">Selected</span>
+  <span class="pill" data-f="com" onclick="setF(this)">Commented</span>
+  <input class="srch" placeholder="Search..." oninput="doSearch(this.value)">
+</div>
+<div class="jobs" id="list"></div>
+<div class="bar">
+  <span style="font-size:13px;color:#555"><span id="bsel">0</span> selected</span>
+  <div style="display:flex;gap:8px">
+    <button class="btn" onclick="alert('Resume Tailor coming next session')">Tailor all</button>
+    <button class="btn grn" onclick="alert('WhatsApp coming next session')">Send to WhatsApp</button>
+  </div>
+</div>
+<script>
+var jobs=[],comments={},selected=new Set(),filter='all',q='';
+var TAGS=['Apply now','Maybe later','SQL blocker','Too senior','Wrong vertical','Location issue'];
+async function load(){
+  var r=await fetch('/api/data');
+  var d=await r.json();
+  jobs=d.jobs||[];comments=d.comments||{};selected=new Set(d.selected||[]);
+  document.getElementById('meta').textContent='Last scan: '+d.scan_date+' — '+d.companies+' companies';
+  document.getElementById('st0').textContent=d.total_scanned||0;
+  document.getElementById('st1').textContent=d.total_shortlisted||0;
+  render();
+}
+function render(){
+  var list=document.getElementById('list');
+  var shown=jobs.filter(function(j){
+    if(filter==='5'&&j.match_score!==5)return false;
+    if(filter==='4'&&j.match_score!==4)return false;
+    if(filter==='3'&&j.match_score!==3)return false;
+    if(filter==='sel'&&!selected.has(j.job_url))return false;
+    if(filter==='com'){var c=comments[j.job_url];if(!c||(!c.text&&(!c.tags||!c.tags.length)))return false;}
+    if(q&&!(j.role_title+j.company_name).toLowerCase().includes(q))return false;
+    return true;
+  });
+  var html='';
+  for(var i=0;i<shown.length;i++){
+    var j=shown[i];var k=j.job_url;var isSel=selected.has(k);
+    var c=comments[k]||{text:'',tags:[]};var sc=j.match_score;
+    var bc=sc===5?'b5':sc===4?'b4':'b3';
+    var loc=j.remote_ok?'Remote':(j.location_raw||'?');
+    var sqlH=j.sql_required?'<span class="sw">SQL required</span>':j.sql_mentioned?'<span class="sw">SQL mentioned</span>':'<span class="so">no SQL</span>';
+    var ek=JSON.stringify(k);
+    var tH='<span class="tl">Tags:</span>';
+    for(var t=0;t<TAGS.length;t++){
+      var tg=TAGS[t];
+      var tc=tg==='Apply now'?'tag good':(['SQL blocker','Too senior','Wrong vertical','Location issue'].indexOf(tg)>=0?'tag bad':'tag');
+      var ta=(c.tags||[]).indexOf(tg)>=0?' act':'';
+      tH+='<span class="'+tc+ta+'" onclick="toggleTag('+ek+','+JSON.stringify(tg)+')">'+tg+'</span>';
+    }
+    html+='<div class="card'+(isSel?' sel':'')+'"><div class="top">';
+    html+='<div class="cb'+(isSel?' on':'')+'" onclick="toggleSel('+ek+')">'+(isSel?'&#10003;':'')+'</div>';
+    html+='<div class="info"><div class="title">'+j.role_title+'<span class="badge '+bc+'">'+sc+'/5</span></div>';
+    html+='<div class="meta"><span>'+j.company_name+'</span><span>'+loc+'</span><span>'+j.company_stage+'</span><span>'+j.industry_vertical+'</span>'+sqlH+'</div></div>';
+    html+='<div class="acts"><a class="btn" href="'+j.apply_url+'" target="_blank">Apply</a>';
+    html+='<button class="btn grn">Tailor</button></div></div>';
+    html+='<div class="reason">'+(j.reason||'')+'</div>';
+    html+='<div class="cmt"><textarea rows="1" placeholder="Add notes..." onchange="saveCmt('+ek+',this.value)">'+(c.text||'')+'</textarea>';
+    html+='<div class="tags">'+tH+'</div></div></div>';
+  }
+  list.innerHTML=html||'<div style="padding:30px;text-align:center;color:#888">No jobs match filter</div>';
+  document.getElementById('st2').textContent=selected.size;
+  document.getElementById('st3').textContent=Object.values(comments).filter(function(c){return c.text||(c.tags&&c.tags.length);}).length;
+  document.getElementById('bsel').textContent=selected.size;
+}
+function toggleSel(k){
+  if(selected.has(k)){selected.delete(k);}else{selected.add(k);}
+  fetch('/api/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,selected:selected.has(k)})});
+  render();
+}
+function saveCmt(k,text){
+  if(!comments[k])comments[k]={text:'',tags:[]};
+  comments[k].text=text;
+  fetch('/api/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,text:text,tags:comments[k].tags||[]})});
+  render();
+}
+function toggleTag(k,tag){
+  if(!comments[k])comments[k]={text:'',tags:[]};
+  var tags=comments[k].tags||[];
+  var idx=tags.indexOf(tag);
+  if(idx>=0){tags.splice(idx,1);}else{tags.push(tag);}
+  comments[k].tags=tags;
+  fetch('/api/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,text:comments[k].text||'',tags:tags})});
+  render();
+}
+function setF(el){document.querySelectorAll('.pill').forEach(function(p){p.classList.remove('on');});el.classList.add('on');filter=el.dataset.f;render();}
+function doSearch(v){q=v.toLowerCase();render();}
+function runScan(){if(confirm('Run fresh scan? Takes ~2 min.')){fetch('/api/scan',{method:'POST'});alert('Scan started! Refresh in 2 min.');}}
+load();
+</script>
+</body>
+</html>
