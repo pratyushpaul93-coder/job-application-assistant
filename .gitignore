@@ -4,3 +4,4 @@ cron.log
 career-ops/
 __pycache__/
 *.pyc
+workspace/
