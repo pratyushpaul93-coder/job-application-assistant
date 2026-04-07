@@ -1,0 +1,6 @@
+*.json
+cron.log
+.env
+career-ops/
+__pycache__/
+*.pyc
