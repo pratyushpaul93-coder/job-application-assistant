@@ -250,6 +250,71 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 
 ---
 
+
+### Session 4 (April 8 2026)
+
+#### Resume Library Built
+- Built `/root/pp-jobapp/resumes/resume_library.txt` — structured text file with 12 resume versions
+- Each version has: full verbatim bullets, summary, unique strengths callouts, [UNIQUE] tags on distinctive bullets, applied-to info, outcome, and tailor instructions
+- Versions in library: BASELINE, GOOGLE, SALESFORCE, ASANA, SUNO, UBER MEMBERSHIPS, TECH STRAT AND PLANNING, WIZ GTM ANALYST, GRAINGER, HARVEY, TURO, EBAY
+- Library context injected into tailor.py prompt (15000 char limit, up from 3000)
+- Tailor instructions at bottom of library file guide which version to use as base for each role type
+
+#### Master Resume Updates
+- Accenture B2B bullet: added detail (competitor analysis, target store segmentation, assortment, sourcing, pricing, operations)
+- Accenture FMCG bullet: replaced with new demand forecasting bullet — "Created demand forecasting model for global shipping giant to better allocate empty containers for sales across 300+ ports worldwide, improving forecasting efficiency by 1% and generating ~$4M in annual savings"
+- AI/Technical Projects: renamed PP OpenClaw Pipeline to "OpenClaw Job Hunting Pipeline", updated to 100+ companies
+- AI/Technical Projects: updated SEC EDGAR and Spotify descriptions to be more concise and descriptive
+- Education section header: changed from "EDUCATION AND INTERNSHIPS" to "EDUCATION AND OTHER EXPERIENCES" in master + generate_pdf.py line 63
+
+#### tailor.py Improvements
+- Library truncation fixed: 3000 -> 15000 chars
+- Version suffix support: now accepts optional 4th arg for versioning (e.g. 'v9', 'v10')
+- Anti-fabrication rules added: Armor Defense hardcoded to exactly 3 bullets, never invent a 4th
+- Anti-compression rules: never remove method/how from bullets, never drop metrics, agency partnerships bullet always included
+- Section order enforced: SUMMARY -> CORE EXPERIENCE -> AI/TECHNICAL PROJECTS -> EDUCATION AND OTHER EXPERIENCES
+- Company order enforced: Armor Defense, Strategy&, Urban Company, Accenture (never reorder)
+- Education header rule: always output "EDUCATION AND OTHER EXPERIENCES"
+- Alice + Civil Defense injection: both lines always guaranteed present in output
+
+#### generate_pdf.py Improvements
+- Education header rewrite (line 63): hardcoded display now says "Education and Other Experiences"
+- SECTIONS list updated: "EDUCATION AND OTHER EXPERIENCES" added as recognized section
+- Bullet CSS: list-style-position: inside with margin-left 11pt and padding-left 5pt (v12 baseline — known good)
+
+#### Harvey Resume — Version History
+- v1-v8: Earlier sessions, iterating on formatting and content
+- v9: First run with library context (15000 chars), Ashby JD fetched successfully (6000 chars)
+- v10: Fixed library truncation + version suffix support
+- v11: Added anti-fabrication + anti-compression rules, bullet CSS fix attempt
+- v12: Best formatting baseline — bullets correct, all content present except Civil Defense + AI projects section order
+- v13: Civil Defense injection fixed, Education header attempted
+- v14: Section order enforced (broke company order — reverted)
+- v15: Rollback attempt
+- v16: Education header fixed in tailor.py + SECTIONS list, AI/Technical Projects above Education
+- v17: Line 63 hardcoded fix — Education and Other Experiences confirmed correct. Civil Defense present. Best version to date.
+
+#### Dashboard UI — Review Panel Built (partially wired)
+- 3 new backend endpoints added to dashboard.py:
+  - POST /api/revise — takes filename + comments, calls Claude to revise .txt in place
+  - POST /api/generate_pdf — runs generate_pdf.py on a .txt file, returns pdf_filename
+  - GET /api/download_pdf — serves PDF file as download
+- View JD button added to each job card (opens apply_url in new tab)
+- Review panel HTML built — Draft tab (shows .txt content), Revise tab (comment box + Apply comments button)
+- Generate PDF button + inline Download link in review panel
+- tailorOrView() function built — opens panel if tailored, re-tails if panel already open
+- TODO next session: fix button wiring (tailorOrView not connected to Tailor button — anchor string mismatch)
+- TODO next session: test full end-to-end flow: Tailor -> Review draft -> Add comments -> Apply -> Generate PDF -> Download
+
+#### Known Issues / Next Session TODO
+1. Dashboard review panel button wiring broken — tailorOrView() built but Tailor button still calls tailorJob() directly
+2. Floating bullet dots in AI/Technical Projects section of PDF — WeasyPrint rendering artifact, different HTML structure from CORE EXPERIENCE bullets
+3. Push all session 4 changes to GitHub
+4. Test full review panel flow end-to-end once button is wired
+5. Consider adding: applied_history.json tracker to flag already-applied companies in Scout results
+
+---
+
 ## Known Issues / TODO
 
 1. WhatsApp gateway pairing broken -- sends not working yet

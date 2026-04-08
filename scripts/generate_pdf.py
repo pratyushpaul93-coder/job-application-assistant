@@ -2,10 +2,10 @@ import os, sys, re
 
 LINKEDIN = "https://www.linkedin.com/in/pratyushpaul/"
 GITHUB = "https://github.com/pratyushpaul93-coder"
-CSS = '@page { size: letter; margin: 0.5in 0.55in 0.5in 0.55in; }\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: Carlito, Calibri, Arial, sans-serif; font-size: 10pt; line-height: 1.30; color: #111; }\n.name { font-size: 18pt; font-weight: 700; margin-bottom: 2pt; }\n.contact { font-size: 9pt; color: #333; margin-bottom: 8pt; }\n.contact a { color: #1a56db; text-decoration: none; }\n.section-title { font-size: 9.5pt; font-weight: 700; text-transform: uppercase; border-bottom: 1pt solid #111; margin-top: 8pt; margin-bottom: 4pt; padding-bottom: 1pt; }\n.company-name { font-weight: 700; font-size: 10pt; margin-bottom: 0pt; }\n.role-line { display: flex; justify-content: space-between; margin-bottom: 2pt; }\n.role-title-text { font-style: italic; font-weight: 400; font-size: 10pt; }\n.role-date { font-weight: 400; font-size: 9.5pt; color: #222; }\nul { margin-left: 11pt; margin-bottom: 5pt; padding: 0; list-style-type: disc; }\nli { margin-bottom: 1pt; font-size: 9.5pt; line-height: 1.30; }\n.summary { margin-bottom: 1pt; font-size: 10pt; }\n.edu-line { display: flex; justify-content: space-between; margin-bottom: 2pt; }\n.sql-note { font-size: 8.5pt; color: #b45309; font-weight: 600; margin-bottom: 5pt; border-left: 2pt solid #f59e0b; padding-left: 4pt; }\np { margin-bottom: 1pt; }\n'
+CSS = '@page { size: letter; margin: 0.5in 0.55in 0.5in 0.55in; }\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: Carlito, Calibri, Arial, sans-serif; font-size: 10pt; line-height: 1.30; color: #111; }\n.name { font-size: 18pt; font-weight: 700; margin-bottom: 2pt; }\n.contact { font-size: 9pt; color: #333; margin-bottom: 8pt; }\n.contact a { color: #1a56db; text-decoration: none; }\n.section-title { font-size: 9.5pt; font-weight: 700; text-transform: uppercase; border-bottom: 1pt solid #111; margin-top: 8pt; margin-bottom: 4pt; padding-bottom: 1pt; }\n.company-name { font-weight: 700; font-size: 10pt; margin-bottom: 0pt; }\n.role-line { display: flex; justify-content: space-between; margin-bottom: 2pt; }\n.role-title-text { font-style: italic; font-weight: 400; font-size: 10pt; }\n.role-date { font-weight: 400; font-size: 9.5pt; color: #222; }\nul { margin: 0 0 5pt 13pt; padding: 0; list-style-type: disc; list-style-position: outside; overflow: visible; }\nli { margin-bottom: 1pt; font-size: 9.5pt; line-height: 1.30; padding-left: 2pt; }\n.summary { margin-bottom: 1pt; font-size: 10pt; }\n.edu-line { display: flex; justify-content: space-between; margin-bottom: 2pt; }\n.sql-note { font-size: 8.5pt; color: #b45309; font-weight: 600; margin-bottom: 5pt; border-left: 2pt solid #f59e0b; padding-left: 4pt; }\np { margin-bottom: 1pt; }\n'
 
 SECTIONS = ["SUMMARY", "CORE EXPERIENCE", "EXPERIENCE",
-            "EDUCATION AND INTERNSHIPS", "EDUCATION",
+            "EDUCATION AND OTHER EXPERIENCES", "EDUCATION AND INTERNSHIPS", "EDUCATION",
             "AI/TECHNICAL PERSONAL PROJECTS", "AI/TECHNICAL PROJECTS", "SKILLS"]
 
 DATE_RE = r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|20\d\d|Present)"
@@ -60,7 +60,7 @@ def to_html(text):
             close_list()
             display = line.rstrip(":")
             if "EDUCATION" in display.upper() and "INTERN" not in display.upper():
-                display = "Education and Internships"
+                display = "Education and Other Experiences"
             html.append(f'<div class="section-title">{display}</div>')
             current_section = matched
             continue
@@ -73,7 +73,7 @@ def to_html(text):
             continue
 
         # Education lines
-        if current_section in ["EDUCATION AND INTERNSHIPS", "EDUCATION"]:
+        if current_section in ["EDUCATION AND OTHER EXPERIENCES", "EDUCATION AND INTERNSHIPS", "EDUCATION"]:
             if "|" in line:
                 parts = [p.strip() for p in line.split("|")]
                 date = parts[-1] if has_date(parts[-1]) else ""

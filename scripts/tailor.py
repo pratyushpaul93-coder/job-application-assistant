@@ -64,23 +64,46 @@ def run(job_url, role_title, company_name):
         return None
 
     master = open(os.path.join(RESUMES_DIR, "master_resume.txt")).read()
+    library_path = os.path.join(RESUMES_DIR, "resume_library.txt")
+    library = open(library_path).read() if os.path.exists(library_path) else ""
     jd = fetch_jd(job_url)
     print("JD fetched: " + str(len(jd)) + " chars")
 
     prompt = (
         "You are an expert resume tailor for Pratyush Paul, a Strategy and Operations professional.\n\n"
         + FRAMEWORK + "\n\n"
-        "MASTER RESUME:\n" + master + "\n\n"
+        "MASTER RESUME (source of truth for all facts and metrics):\n" + master + "\n\n"
+        "RESUME LIBRARY (alternative framings by role type - use these as building blocks):\n" + library[:15000] + "\n\n"
         "JOB: " + role_title + " at " + company_name + "\n"
         "JOB DESCRIPTION:\n" + jd + "\n\n"
         "TASK: Produce a tailored resume. Output ONLY the resume text, no preamble, no markdown.\n"
         "Rules:\n"
-        "- Keep all real metrics exactly as stated\n"
+        "- Keep all real metrics exactly as stated -- AND keep the context around them (the how and the so what)\n"
+        "- Keep 3-4 bullets per role minimum. Never drop below 3\n"
+        "- Each bullet should be 1.5-2 full lines long when rendered -- write FULL, DETAILED bullets not short ones\n"
+        "- Bullet structure: [Action verb] + [what you did in detail] + [how/method] + [measurable result]. Include all 4 parts\n"
+        "- Do NOT write short punchy bullets. Write complete sentences with full context, exactly like these examples:\n"
+        "  GOOD: Led migration of cybersecurity technology platform used by 400+ clients, providing secure monitored cloud infra with inheritable compliance, reaching 80% adoption within 3 months while retaining 98% of clients\n"
+        "  BAD: Led platform migration for 400+ clients, achieving 80% adoption\n"
+        "  GOOD: Conducted market research and financial modeling to recommend acquisition targets valued at $10M+ that expanded product portfolio by 30% and entered 2 new market segments\n"
+        "  BAD: Financial modeling to recommend $10M+ targets expanding portfolio by 30%\n"
+        "- Prefer shortening bullets over dropping them. But never make bullets shorter than 1.5 rendered lines\n"
+        "- NEVER remove the method/how from a bullet when compressing. The HOW is a differentiator. Only cut adjectives and filler words\n"
+        "- NEVER drop or thin out metrics. If a bullet has a percent or dollar figure, it must survive intact\n"
+        "- NEVER add bullets not grounded in the master resume. If no real metric exists for a bullet, drop it rather than writing a vague one\n"
+        "- Armor Defense has EXACTLY 3 bullets in the master resume. Never write a 4th Armor Defense bullet under any circumstances. 3 bullets only.\n"
+        "- The agency partnerships bullet from Urban Company (10% cost reduction, 15% quality improvement) must always be included\n"
+        "- Preserve specific product/context details (e.g. what the platform does, what market it served) -- these are differentiators\n"
+        "- Do not drop entire bullets to save space. Instead: tighten wording, cut adjectives, combine where natural\n"
+        "- Target density: 3-4 tight bullets per role, each with an action verb + what + measurable result\n"
         "- Reorder bullets to lead with most relevant experience for this role\n"
         "- Rewrite summary (3-4 lines) to mirror this JD language and needs\n"
         "- Integrate 3-5 keywords from JD naturally into existing bullets\n"
         "- Keep AI/Technical Projects section if company is AI-native\n"
         "- Flag SQL requirements with [SQL NOTE: required/preferred] at top\n"
+        "- Education section must be titled exactly: EDUCATION AND OTHER EXPERIENCES\n"
+        "- Section order must always be: 1) SUMMARY 2) CORE EXPERIENCE (chronological, most recent first) 3) AI/TECHNICAL PROJECTS 4) EDUCATION AND OTHER EXPERIENCES\n"
+        "- NEVER reorder the companies within CORE EXPERIENCE. Always: Armor Defense first, then Strategy&, then Urban Company, then Accenture\n"
         "- Plain text format, same structure as master resume\n"
         "- ONE PAGE worth of content maximum"
     )
@@ -90,7 +113,11 @@ def run(job_url, role_title, company_name):
 
     slug = (role_title + "_" + company_name).lower().replace(" ", "_").replace("/", "_")[:50]
     date_str = str(datetime.date.today())
-    filename = date_str + "_" + slug + ".txt"
+    import sys as _sys
+    version = ""
+    if len(_sys.argv) > 4:
+        version = "_" + _sys.argv[4]
+    filename = date_str + "_" + slug + version + ".txt"
     filepath = os.path.join(OUTPUT_DIR, filename)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -108,25 +135,28 @@ def run(job_url, role_title, company_name):
     json.dump(tracker, open(tracker_path, "w"), indent=2)
 
     # Verify Alice internship is present - inject if missing
+    alice_line = "Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017"
+    civdef_line = "Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014"
+
     if "Alice" not in tailored:
-        alice_line = "Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017"
         if "Singapore Civil Defense" in tailored:
-            tailored = tailored.replace(
-                "Singapore Civil Defense Force",
-                alice_line + "\nSingapore Civil Defense Force"
-            )
+            tailored = tailored.replace("Singapore Civil Defense Force", alice_line + "\n" + civdef_line)
         elif "National University" in tailored:
-            # Add after NUS line
             lines = tailored.split("\n")
             for i, line in enumerate(lines):
                 if "National University" in line:
+                    lines.insert(i + 1, civdef_line)
                     lines.insert(i + 1, alice_line)
                     break
             tailored = "\n".join(lines)
         open(filepath, "w").write(tailored)
-        print("Alice internship injected (was missing from Claude output)")
+        print("Alice + Civil Defense injected")
+    elif "Singapore Civil Defense" not in tailored:
+        tailored = tailored.replace(alice_line, alice_line + "\n" + civdef_line)
+        open(filepath, "w").write(tailored)
+        print("Civil Defense injected (was missing)")
     else:
-        print("Alice internship present - OK")
+        print("Alice + Civil Defense both present - OK")
 
     print("Saved: " + filepath)
     print("\n" + "="*60)

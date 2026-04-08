@@ -28,17 +28,17 @@ Strategy and Operations Manager | Jan 2022 - Aug 2022
 
 Accenture, Singapore
 Management Consultant | Mar 2018 - Dec 2021
-- Designed and implemented B2B marketplace launch strategy generating over $1.2M in sales across SEA in first 3 months
-- Designed operational improvements for new distribution channel of global FMCG player, improving process efficiency by 35%
+- Designed and implemented B2B marketplace launch strategy (competitor analysis, target store segmentation, assortment, sourcing, pricing, and operations), generating over $1.2M in sales across Southeast Asian markets within first 3 months of operations
+- Created demand forecasting model for global shipping giant to better allocate empty containers for sales across 300+ ports worldwide, improving forecasting efficiency by 1% and generating ~$4M in annual savings
 - Directed team of 4 analysts, delivered recommendations driving 20% ROI increase for big tech APAC HQ
 - Managed $5M strategic initiative for gaming client, led cross-functional collaboration on business and technical solutions
 
-EDUCATION
+EDUCATION AND OTHER EXPERIENCES
 National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
 Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
 Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
 
 AI/TECHNICAL PROJECTS (built during job search)
-- SEC EDGAR RAG System: Python RAG pipeline using sentence-transformers and Claude Haiku for SEC filing analysis. Custom numpy vectorstore. GitHub: pp-market-intelligence
-- Spotify MCP Server: Genre classifier with 5-tier fallback system, automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
-- PP OpenClaw Pipeline: Automated job search pipeline scanning 25 companies via ATS APIs, DeepSeek scoring, Flask dashboard. GitHub: pp-openclaw-jobapp
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
+- OpenClaw Job Hunting Pipeline: Job search automation scanning 100+ companies via ATS APIs, DeepSeek scoring, Flask dashboard

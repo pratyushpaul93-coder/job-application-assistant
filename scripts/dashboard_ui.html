@@ -51,6 +51,16 @@ textarea:focus{outline:none;border-color:#1a7a55}
 .toast{position:fixed;top:60px;right:16px;background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;z-index:100;display:none}
 .tailor-status{font-size:11px;color:#2563eb;margin-left:6px;display:none}
 @media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.acts{display:none}}
+
+.review-panel{display:none;margin:10px 0 0 30px;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden}
+.review-panel.open{display:block}
+.review-tabs{display:flex;border-bottom:1px solid #e5e5e5;background:#f9f9f9}
+.review-tab{padding:8px 14px;font-size:12px;cursor:pointer;color:#666;border-bottom:2px solid transparent}
+.review-tab.active{color:#111;border-bottom-color:#111;font-weight:600}
+.review-content{padding:12px;background:#fff}
+.draft-text{font-size:11px;font-family:monospace;white-space:pre-wrap;line-height:1.5;color:#333;max-height:400px;overflow-y:auto;background:#f9f9f9;padding:10px;border-radius:6px}
+.review-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.review-note{font-size:11px;color:#888;margin-top:6px}
 </style>
 </head>
 <body>
@@ -89,7 +99,7 @@ textarea:focus{outline:none;border-color:#1a7a55}
   </div>
 </div>
 <script>
-var jobs=[],comments={},selected=new Set(),filter='all',q='',tailoredUrls=new Set();
+var jobs=[],comments={},selected=new Set(),filter='all',q='',tailoredUrls=new Set(),tailoredFiles={};
 var TAGS=['Apply now','Maybe later','SQL blocker','Too senior','Wrong vertical','Location issue'];
 
 function showToast(msg,ms){
@@ -115,6 +125,7 @@ async function load(){
   document.getElementById('st1').textContent=d.total_shortlisted||0;
   var tr=await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
   tailoredUrls=new Set(tr.map(function(t){return t.job_url;}));
+  tr.forEach(function(t){tailoredFiles[t.job_url]=t.tailored_file;});
   render();
 }
 
@@ -153,12 +164,31 @@ function render(){
     html+='<div class="cb'+(isSel?' on':'')+'" onclick="toggleSel('+ek+')">'+(isSel?'&#10003;':'')+'</div>';
     html+='<div class="info"><div class="title">'+j.role_title+'<span class="badge '+bc+'">'+sc+'/5</span>'+(isTailored?'<span style="font-size:11px;color:#2563eb;margin-left:6px">&#10003; tailored</span>':'')+'</div>';
     html+='<div class="meta"><span>'+j.company_name+'</span><span>'+loc+'</span><span>'+j.company_stage+'</span>'+dateH+sqlH+'</div></div>';
-    html+='<div class="acts"><a class="btn" href="'+j.apply_url+'" target="_blank">Apply</a>';
-    html+='<button class="btn '+(isTailored?'blu':'grn')+'" onclick="tailorJob('+ek+','+JSON.stringify(j.role_title)+','+JSON.stringify(j.company_name)+')">'+(isTailored?'Re-tailor':'Tailor')+'</button></div>';
+    html+='<div class="acts"><a class="btn" href="'+j.apply_url+'" target="_blank">Apply</a><a class="btn" href="'+j.apply_url+'" target="_blank">View JD</a>';
+    html+='<button class="btn '+(isTailored?'blu':'grn')+'" onclick="tailorOrView('+ek+','+i+','+JSON.stringify(j.role_title)+','+JSON.stringify(j.company_name)+')">'+(isTailored?'Review / Re-tailor':'Tailor')+'</button></div>';
     html+='</div>';
     html+='<div class="reason">'+(j.reason||'')+'</div>';
     html+='<div class="cmt"><textarea rows="1" placeholder="Add notes..." onchange="saveCmt('+ek+',this.value)">'+(c.text||'')+'</textarea>';
-    html+='<div class="tags">'+tH+'</div></div></div>';
+    html+='<div class="tags">'+tH+'</div></div>';
+    var rp=tailoredFiles[k]||null;
+    html+='<div class="review-panel" id="rp-'+i+'">';
+    html+='<div class="review-tabs">';
+    html+='<div class="review-tab active" onclick="switchTab('+i+',\'draft\',this)">Draft</div>';
+    html+='<div class="review-tab" onclick="switchTab('+i+',\'revise\',this)">Revise</div>';
+    html+='</div>';
+    html+='<div class="review-content" id="rc-'+i+'">';
+    html+='<div class="draft-text" id="dt-'+i+'">Loading draft...</div>';
+    html+='<div class="review-actions">';
+    html+='<button class="btn grn" onclick="generatePDF('+i+','+ek+')">Generate PDF</button>';
+    html+='<span id="pdf-status-'+i+'" style="font-size:11px;color:#888"></span>';
+    html+='</div>';
+    html+='<div id="revise-panel-'+i+'" style="display:none;margin-top:10px">';
+    html+='<textarea id="rev-input-'+i+'" rows="3" placeholder="Describe changes... e.g. Make the summary shorter, emphasize marketplace experience more"></textarea>';
+    html+='<div class="review-actions">';
+    html+='<button class="btn grn" onclick="applyRevision('+i+','+ek+')">Apply comments</button>';
+    html+='<span id="rev-status-'+i+'" style="font-size:11px;color:#888"></span>';
+    html+='</div></div>';
+    html+='</div></div></div>';
   }
   list.innerHTML=html||'<div style="padding:30px;text-align:center;color:#888">No jobs match filter</div>';
   document.getElementById('st2').textContent=selected.size;
@@ -216,9 +246,12 @@ function pollTailorStatus(){
     var ts=document.getElementById('tailor-status');
     if(s.status==='done'){
       ts.textContent='';ts.style.display='none';
-      showToast('Resume tailored! Check /root/pp-jobapp/resumes/tailored/',4000);
+      showToast('Resume tailored! Click Tailor button to review draft.',4000);
+      var tr2=await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
+      tr2.forEach(function(t){tailoredFiles[t.job_url]=t.tailored_file;});
       var tr=await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
       tailoredUrls=new Set(tr.map(function(t){return t.job_url;}));
+  tr.forEach(function(t){tailoredFiles[t.job_url]=t.tailored_file;});
       render();
       clearInterval(interval);
     } else if(s.status==='error'){
@@ -252,6 +285,81 @@ function runScan(){
 }
 
 load();
+
+function tailorOrView(k, idx, title, company) {
+  var rp = document.getElementById('rp-'+idx);
+  if (!rp) return;
+  // If already tailored and panel closed, open it to show draft
+  if (tailoredUrls.has(k) && rp.style.display !== 'block') {
+    rp.style.display = 'block';
+    loadDraft(idx, k);
+    return;
+  }
+  // If panel already open, close it
+  if (rp.style.display === 'block') {
+    rp.style.display = 'none';
+    return;
+  }
+  // Otherwise tailor fresh
+  tailorJob(k, title, company);
+}
+
+function loadDraft(idx, k) {
+  var filename = tailoredFiles[k];
+  if (!filename) { document.getElementById('dt-'+idx).textContent = 'No draft found'; return; }
+  fetch('/api/tailored_resume_content?file='+encodeURIComponent(filename))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var el = document.getElementById('dt-'+idx);
+      if (el) el.textContent = d.content || d.error || 'Could not load';
+    });
+}
+
+function switchTab(idx, tab, el) {
+  document.querySelectorAll('#rp-'+idx+' .review-tab').forEach(function(t){t.classList.remove('active');});
+  el.classList.add('active');
+  var rp = document.getElementById('revise-panel-'+idx);
+  if (tab === 'revise') { if(rp) rp.style.display='block'; }
+  else { if(rp) rp.style.display='none'; }
+}
+
+function generatePDF(idx, k) {
+  var filename = tailoredFiles[k];
+  if (!filename) { showToast('No draft file found'); return; }
+  var status = document.getElementById('pdf-status-'+idx);
+  if (status) { status.textContent = 'Generating PDF...'; }
+  fetch('/api/generate_pdf', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:filename})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) {
+        if (status) status.innerHTML = 'PDF ready! <a href="/api/download_pdf?file='+encodeURIComponent(d.pdf_filename)+'" style="color:#2563eb;text-decoration:underline" download>Download</a>';
+      } else {
+        if (status) status.textContent = 'Error: ' + (d.error||'unknown');
+      }
+    });
+}
+
+function applyRevision(idx, k) {
+  var filename = tailoredFiles[k];
+  var comments = document.getElementById('rev-input-'+idx);
+  if (!filename || !comments || !comments.value.trim()) { showToast('Add revision notes first'); return; }
+  var status = document.getElementById('rev-status-'+idx);
+  if (status) status.textContent = 'Applying revision...';
+  fetch('/api/revise', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:filename, comments:comments.value})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) {
+        var dt = document.getElementById('dt-'+idx);
+        if (dt) dt.textContent = d.content;
+        if (status) status.textContent = 'Revision applied!';
+        if (comments) comments.value = '';
+        showToast('Revision applied. Review draft and generate PDF when ready.');
+      } else {
+        if (status) status.textContent = 'Error: '+(d.error||'unknown');
+      }
+    });
+}
+
 </script>
 </body>
 </html>
