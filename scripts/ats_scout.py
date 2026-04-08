@@ -1,60 +1,45 @@
-import json, urllib.request, datetime, os
+import json, urllib.request, os, datetime
 
 WORKSPACE = '/root/pp-jobapp/workspace'
 
-# Role keywords - POSITIVE (must match at least one)
-# Covers: S&O, CoS, GTM Ops, Sales Ops, Rev Ops, Product Ops, Strategic Programs
 ROLE_KEYWORDS_POSITIVE = [
-    # Strategy & Operations variants
     'strategy & operations', 'strategy and operations', 'strategic operations',
     'strategy operations', 'bizops', 'biz ops', 'business operations',
     'operational strategy', 'operational excellence',
-    # Chief of Staff
     'chief of staff', 'cos ',
-    # GTM Operations
     'gtm operations', 'gtm ops', 'go-to-market operations', 'go to market operations',
     'gtm strategy', 'gtm programs',
-    # Sales Operations
     'sales operations', 'sales ops',
-    # Revenue Operations
     'revenue operations', 'revenue ops', 'revops', 'rev ops',
-    # Product Operations
     'product operations', 'product ops',
-    # Growth/Field Operations
     'growth operations', 'field operations manager',
     'head of operations', 'vp of operations', 'director of operations',
     'vp operations', 'director operations',
-    # Strategic Programs & Planning
     'strategic program', 'strategic programs', 'strategic initiatives',
     'strategy and planning', 'strategy & planning',
     'program manager, strategy', 'program manager strategy',
     'technical program manager',
-    # General Manager
     'general manager',
-    # Finance & Ops adjacent
     'gtm finance', 'strategic finance',
-    # Onboarding & Readiness (S&O adjacent at startups)
     'gtm onboarding', 'gtm readiness',
 ]
 
-# Negative keywords - if any match, skip the role
 ROLE_KEYWORDS_NEGATIVE = [
     'security operations', 'soc analyst', 'it operations', 'it ops',
     'devops', 'dev ops', 'sre ', 'site reliability',
     'software engineer', 'software developer', 'ml engineer', 'ai engineer',
     'data engineer', 'data scientist', 'research engineer',
-    'marketing operations', 'marketing ops',  # too functional
+    'marketing operations', 'marketing ops',
     'hr operations', 'people operations analyst', 'people ops analyst',
     'facilities', 'legal operations',
     'customer success', 'support operations', 'customer operations analyst',
     'intern', 'junior', 'coordinator',
     'recruiting operations', 'talent operations',
-    'financial operations analyst',  # too junior
-    'lifecycle marketing operations',  # too functional
+    'financial operations analyst',
+    'lifecycle marketing operations',
 ]
 
 COMPANIES = [
-    # Ashby
     {'name': 'Ramp', 'ats': 'ashby', 'slug': 'ramp', 'stage': 'Series D+', 'vertical': 'Fintech'},
     {'name': 'Notion', 'ats': 'ashby', 'slug': 'notion', 'stage': 'Series C', 'vertical': 'SaaS'},
     {'name': 'Vanta', 'ats': 'ashby', 'slug': 'vanta', 'stage': 'Series C', 'vertical': 'SaaS'},
@@ -67,7 +52,6 @@ COMPANIES = [
     {'name': 'Linear', 'ats': 'ashby', 'slug': 'linear', 'stage': 'Series B', 'vertical': 'SaaS'},
     {'name': 'Zapier', 'ats': 'ashby', 'slug': 'zapier', 'stage': 'Bootstrapped', 'vertical': 'SaaS'},
     {'name': 'n8n', 'ats': 'ashby', 'slug': 'n8n', 'stage': 'Series B', 'vertical': 'SaaS'},
-    # Greenhouse
     {'name': 'Glean', 'ats': 'greenhouse', 'slug': 'gleanwork', 'stage': 'Series E', 'vertical': 'AI'},
     {'name': 'Brex', 'ats': 'greenhouse', 'slug': 'brex', 'stage': 'Series D', 'vertical': 'Fintech'},
     {'name': 'Cyera', 'ats': 'greenhouse', 'slug': 'cyera', 'stage': 'Series C', 'vertical': 'SaaS'},
@@ -76,7 +60,6 @@ COMPANIES = [
     {'name': 'Intercom', 'ats': 'greenhouse', 'slug': 'intercom', 'stage': 'Public', 'vertical': 'SaaS'},
     {'name': 'Anthropic', 'ats': 'greenhouse', 'slug': 'anthropic', 'stage': 'Series E', 'vertical': 'AI'},
     {'name': 'Wiz', 'ats': 'greenhouse', 'slug': 'wizsecurity', 'stage': 'Series E', 'vertical': 'SaaS'},
-    # Lever
     {'name': 'Figma', 'ats': 'lever', 'slug': 'figma', 'stage': 'Public', 'vertical': 'SaaS'},
     {'name': 'Mistral', 'ats': 'lever', 'slug': 'mistral', 'stage': 'Series B', 'vertical': 'AI'},
     {'name': 'Weights & Biases', 'ats': 'lever', 'slug': 'wandb', 'stage': 'Series C', 'vertical': 'AI'},
@@ -89,7 +72,24 @@ def fetch_url(url):
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as r:
             return json.loads(r.read().decode())
-    except Exception as e:
+    except:
+        return None
+
+def parse_date(raw):
+    if not raw:
+        return ''
+    try:
+        return raw[:10]
+    except:
+        return str(raw)[:10]
+
+def days_ago(date_str):
+    if not date_str:
+        return None
+    try:
+        d = datetime.date.fromisoformat(date_str[:10])
+        return (datetime.date.today() - d).days
+    except:
         return None
 
 def is_target_role(title):
@@ -114,6 +114,7 @@ def fetch_ashby(company):
         location = j.get('location', '') or ''
         if isinstance(location, dict):
             location = location.get('name', '')
+        posted = parse_date(j.get('publishedAt', ''))
         matches.append({
             'company_name': company['name'],
             'role_title': title,
@@ -121,6 +122,8 @@ def fetch_ashby(company):
             'job_url': j.get('jobUrl', ''),
             'source': 'ashby',
             'date_found': str(datetime.date.today()),
+            'posted_date': posted,
+            'days_ago': days_ago(posted),
             'location_raw': location,
             'remote_ok': j.get('isRemote', False),
             'company_stage': company.get('stage', 'Unknown'),
@@ -144,6 +147,7 @@ def fetch_greenhouse(company):
         location = j.get('location', {})
         if isinstance(location, dict):
             location = location.get('name', '')
+        posted = parse_date(j.get('updated_at', '') or j.get('first_published', ''))
         matches.append({
             'company_name': company['name'],
             'role_title': title,
@@ -151,6 +155,8 @@ def fetch_greenhouse(company):
             'job_url': j.get('absolute_url', ''),
             'source': 'greenhouse',
             'date_found': str(datetime.date.today()),
+            'posted_date': posted,
+            'days_ago': days_ago(posted),
             'location_raw': location,
             'remote_ok': 'remote' in location.lower() if location else False,
             'company_stage': company.get('stage', 'Unknown'),
@@ -172,6 +178,13 @@ def fetch_lever(company):
             continue
         cats = j.get('categories', {})
         location = cats.get('location', '') or ''
+        raw_ts = j.get('createdAt', 0)
+        posted = ''
+        if raw_ts:
+            try:
+                posted = str(datetime.date.fromtimestamp(raw_ts / 1000))
+            except:
+                posted = ''
         matches.append({
             'company_name': company['name'],
             'role_title': title,
@@ -179,6 +192,8 @@ def fetch_lever(company):
             'job_url': j.get('hostedUrl', ''),
             'source': 'lever',
             'date_found': str(datetime.date.today()),
+            'posted_date': posted,
+            'days_ago': days_ago(posted),
             'location_raw': location,
             'remote_ok': 'remote' in location.lower() if location else False,
             'company_stage': company.get('stage', 'Unknown'),
@@ -188,10 +203,9 @@ def fetch_lever(company):
         })
     return matches, len(data)
 
-# Main scan
-print(f"PP Job Scout - ATS API Scan")
-print(f"Date: {datetime.date.today()}")
-print(f"Companies: {len(COMPANIES)}")
+print("PP Job Scout - ATS API Scan")
+print("Date: " + str(datetime.date.today()))
+print("Companies: " + str(len(COMPANIES)))
 print("-" * 50)
 
 all_jobs = []
@@ -208,23 +222,27 @@ for company in COMPANIES:
         elif ats == 'lever':
             matches, total = fetch_lever(company)
         else:
-            print(f"  {company['name']}: skipped (custom ATS - use Tavily fallback)")
+            print("  " + company['name'] + ": skipped (custom ATS)")
             company_stats.append({'company': company['name'], 'ats': 'custom', 'total_jobs': 0, 'matches': 0, 'status': 'skipped'})
             continue
-
         status = 'ok' if total > 0 else 'empty'
-        print(f"  {company['name']} ({ats}): {len(matches)} potential matches, {total} total jobs")
+        print("  " + company['name'] + " (" + ats + "): " + str(len(matches)) + " potential matches, " + str(total) + " total jobs")
         all_jobs.extend(matches)
         company_stats.append({'company': company['name'], 'ats': ats, 'total_jobs': total, 'matches': len(matches), 'status': status})
-
     except Exception as e:
-        errors.append(f"{company['name']}: {e}")
-        print(f"  {company['name']}: ERROR - {e}")
-        company_stats.append({'company': company['name'], 'ats': ats, 'total_jobs': 0, 'matches': 0, 'status': f'error: {e}'})
+        errors.append(company['name'] + ": " + str(e))
+        print("  " + company['name'] + ": ERROR - " + str(e))
+        company_stats.append({'company': company['name'], 'ats': ats, 'total_jobs': 0, 'matches': 0, 'status': 'error'})
 
 print("-" * 50)
-print(f"Total potential matches: {len(all_jobs)}")
-print(f"Companies returning 0 jobs (check slugs): {[s['company'] for s in company_stats if s['total_jobs'] == 0 and s['status'] != 'skipped']}")
+print("Total potential matches: " + str(len(all_jobs)))
+broken = [s['company'] for s in company_stats if s['total_jobs'] == 0 and s['status'] != 'skipped']
+if broken:
+    print("Companies returning 0 jobs: " + str(broken))
+
+if all_jobs:
+    sample = all_jobs[0]
+    print("Sample posting date: " + str(sample.get('posted_date', 'N/A')) + " (" + str(sample.get('days_ago', '?')) + " days ago)")
 
 output = {
     'scan_date': str(datetime.date.today()),
@@ -235,9 +253,7 @@ output = {
     'jobs': all_jobs,
     'errors': errors,
 }
-
 os.makedirs(WORKSPACE, exist_ok=True)
-with open(f'{WORKSPACE}/raw_jobs.json', 'w') as f:
+with open(WORKSPACE + '/raw_jobs.json', 'w') as f:
     json.dump(output, f, indent=2)
-
-print(f"Written to {WORKSPACE}/raw_jobs.json")
+print("Written to " + WORKSPACE + "/raw_jobs.json")

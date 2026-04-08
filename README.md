@@ -2,13 +2,15 @@
 
 **Server:** pp-openclaw-jobapp | **IP:** 87.99.133.98 | **Hetzner:** pp_openclaw_1_jobapplication (ID: 14075210)
 **GitHub:** github.com/pratyushpaul93-coder/pp-openclaw-jobapp (private)
-**Dashboard:** http://87.99.133.98:5000 (accessible from any browser including mobile)
+**Dashboard:** http://87.99.133.98:5000 (browser + mobile)
+
+---
 
 ## Overall Objective
 
 Automate the end-to-end job search pipeline for Pratyush Paul.
-- Phase 1 (current): Find real jobs, score them, review in dashboard, tailor resumes on demand
-- Phase 2 (future): Auto-apply + LinkedIn outreach automation
+- Phase 1 (complete): Scout jobs via ATS APIs, score with DeepSeek, review in dashboard, tailor resumes to PDF
+- Phase 2 (next): WhatsApp delivery, auto-apply, LinkedIn outreach automation
 
 ## Target Roles
 
@@ -25,168 +27,237 @@ High-growth SaaS Series A-D, AI-native startups, PE-backed tech, VC portfolio co
 
 ### Core principle: LLM only where reasoning is needed
 
-| Component | Tool | Cost | LLM? |
-|-----------|------|------|-------|
-| Scout | Pure Python + ATS JSON APIs | Free | No |
-| Matcher | Python + DeepSeek API | ~$0.002/job | Yes (scoring) |
-| Dashboard | Flask web app | Free | No |
-| Resume Tailor | Claude Sonnet via OpenClaw | ~$0.05/resume | Yes (writing) |
-| WhatsApp | OpenClaw gateway | Free | No |
+| Component | Script | Tool | Cost |
+|-----------|--------|------|------|
+| Scout | ats_scout.py | ATS JSON APIs (no LLM) | Free |
+| Matcher | ats_matcher.py | DeepSeek API | ~$0.002/job |
+| Dashboard | dashboard.py + dashboard_ui.html | Flask | Free |
+| Resume Tailor | tailor.py | Claude Sonnet 4 | ~$0.05/resume |
+| PDF Generator | generate_pdf.py | WeasyPrint | Free |
+| Notifications | OpenClaw gateway | WhatsApp (pending) | Free |
 
-### Pipeline flow
+### Daily pipeline (cron 1pm UTC = 7am Chicago)
 
-ats_scout.py -> raw_jobs.json -> ats_matcher.py -> shortlist.json -> Flask dashboard -> Resume Tailor -> .docx
-
-### Daily cron (1pm UTC = 7am Chicago)
-
-0 13 * * * python3 /root/pp-jobapp/scripts/ats_scout.py >> /root/pp-jobapp/cron.log 2>&1 && python3 /root/pp-jobapp/scripts/ats_matcher.py >> /root/pp-jobapp/cron.log 2>&1
+ats_scout.py -> raw_jobs.json -> ats_matcher.py -> shortlist.json -> Dashboard review -> tailor.py -> generate_pdf.py -> PDF
 
 ---
 
-## Scout: ATS API Direct Fetcher
+## Scout: ATS API Direct Fetcher (ats_scout.py)
 
-Scans 25 companies via public JSON APIs (no auth, no Playwright, no hallucination risk).
+Scans companies via public JSON APIs. Zero LLM, zero hallucination risk, ~30 seconds runtime.
 
-### ATS platforms supported
+### ATS platforms
 
-**Ashby:** GET https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true
-**Greenhouse:** GET https://api.greenhouse.io/v1/boards/{slug}/jobs?content=true
-**Lever:** GET https://api.lever.co/v0/postings/{slug}
+| Platform | Endpoint | Notes |
+|----------|----------|-------|
+| Ashby | api.ashbyhq.com/posting-api/job-board/{slug} | Returns publishedAt date |
+| Greenhouse | api.greenhouse.io/v1/boards/{slug}/jobs | Returns updated_at date |
+| Lever | api.lever.co/v0/postings/{slug} | Returns createdAt timestamp |
 
-### ATS auto-detection
+### Posting date capture
 
-For any new company, Scout tries: Ashby -> Greenhouse -> Lever -> custom/Tavily fallback.
-Uses whichever returns jobs > 0. Slug is usually company name lowercase (exceptions: Glean=gleanwork, WandB=wandb).
+Scout captures posted_date and days_ago for every job. Dashboard shows color-coded freshness:
+- Green: posted within 14 days
+- Amber: 15-30 days
+- Red: 30+ days (stale, deprioritize)
 
-### Current verified company list (25 companies)
+### Verified company slugs (25 companies)
 
 Ashby: ramp, notion, vanta, harvey, elevenlabs, cohere, langchain, pinecone, sierra, linear, zapier, n8n
 Greenhouse: gleanwork, brex, airtable, vercel, intercom, anthropic, wizsecurity
 Lever: figma, mistral, wandb, spotify
 Custom ATS (Tavily fallback): rippling
-Broken slugs (fix next session): cyera, wiz, figma, wandb
+Broken slugs (TODO fix): cyera, wiz, figma, wandb
 
 ---
 
 ## Company List Management
 
-### Single source of truth (TODO: migrate to scripts/companies.json)
+### Three ways to add companies (TODO: migrate to companies.json)
 
-Each company entry: name, ats_type, slug, stage, vertical, source, verified flag
+1. VC portal scanner (weekly script) -- auto-detects ATS, adds to list
+2. CLI: python3 scripts/add_company.py "Company Name" -- auto-detects ATS, verifies slug
+3. Dashboard GUI "Add Company" button (planned) -- type name, auto-detects ATS
+4. WhatsApp: "add company X" (planned)
 
-### Three ways to add companies
+### ATS auto-detection order
 
-1. **VC portal scanner** (weekly): Fetches a16z/Bessemer/Sequoia portfolio pages, extracts company names,
-   auto-detects ATS, adds to companies.json if not already present
-2. **CLI tool** (manual): python3 scripts/add_company.py "Cursor" -- auto-detects ATS, verifies slug works, adds to file
-3. **Dashboard GUI** (planned): Add Company button in dashboard UI -- enter company name, system auto-detects ATS,
-   verifies the slug returns jobs, adds to companies.json and immediately includes in next scan
-4. **WhatsApp trigger** (planned): Message "add company Cursor" -> OpenClaw calls add_company.py
-
-### Comment-driven scoring refinement
-
-Each job card in the dashboard has a free-text comment field and quick tags (Apply now, Maybe later,
-SQL blocker, Too senior, Wrong vertical, Location issue). These save to workspace/comments.json.
-The Matcher reads comments on every run to refine scoring for future shortlists.
+Try Ashby -> Greenhouse -> Lever -> mark as custom/Tavily fallback
+Use whichever returns jobs > 0. Common slug variations: Glean=gleanwork, WandB=wandb
 
 ---
 
-## Dashboard (Flask -- scripts/dashboard.py)
+## Matcher: Scoring Pipeline (ats_matcher.py)
 
-Accessible at http://87.99.133.98:5000 from any browser or mobile device.
-Runs as systemd service (pp-dashboard.service) -- survives reboots.
+Reads raw_jobs.json, calls DeepSeek once per job to score 1-5 against Pratyush profile.
+Writes shortlist.json and whatsapp_message.txt.
+
+### Scoring rubric
+
+5 = Excellent: target role + AI-native/SaaS company + consulting or marketplace background valued
+4 = Good: role matches well, strong company, minor gaps
+3 = Possible: role matches but company stage unclear OR SQL hard required
+2 = Weak: adjacent role or poor company fit
+1 = Skip
+
+---
+
+## Dashboard (dashboard.py + dashboard_ui.html)
+
+Accessible at http://87.99.133.98:5000. Runs as systemd service (pp-dashboard), survives reboots.
 
 ### Features
 
-- Stats bar: total scanned, shortlisted, selected, commented
-- Filter pills: All, 5/5, 4/5, 3/5, Selected, Commented
-- Search box: filter by role title or company name
-- Job cards (per role):
-  - Score badge (5/5=green, 4/5=blue, 3/5=gray)
-  - Company, location, stage, vertical, SQL mention flag
-  - DeepSeek-generated fit reason
-  - Checkbox to select for application
-  - Apply button (direct URL to ATS listing)
-  - Tailor button (triggers Resume Tailor -- coming next session)
-  - Free text comment area (saves to comments.json)
-  - Quick tags: Apply now, Maybe later, SQL blocker, Too senior, Wrong vertical, Location issue
-- Bulk action bar: Tailor all selected, Send to WhatsApp
-- Run scan button: triggers Scout + Matcher in background
+- Stats: total scanned, shortlisted, selected, commented
+- Filter pills: All, 5/5, 4/5, 3/5, Selected, Commented, Posted <14d, Tailored
+- Search by role or company name
+- Job cards: score badge, company, location, stage, posting date (color-coded freshness), SQL flag
+- Checkbox to select jobs for application
+- Apply button (direct ATS link)
+- Tailor button: fires tailor.py, shows "Tailoring..." status, polls until done
+- Tailored badge on completed resumes (blue outline + check mark)
+- Re-tailor option to regenerate
+- Free text comment per job (saved to comments.json, feeds Matcher scoring)
+- Quick tags: Apply now, Maybe later, SQL blocker, Too senior, Wrong vertical, Location issue
+- Scan button with states: "Run scan" -> "Scanning..." -> "Scan ready" (auto-reloads data)
+- Bulk actions: Tailor selected, Send to WhatsApp
 
-### Planned dashboard features
+### Planned features
 
-- Add Company button: enter company name, auto-detect ATS, verify slug, add to company list
-- Deduplication indicator: flag roles appearing multiple times from same ATS
-- Resume status: show which roles have drafts ready
+- Add Company button with ATS auto-detection
+- Download PDF button per tailored resume
+- Application history tracker (dedup against prior applications)
+- Resume review panel in UI (show draft, add comments, apply revisions, generate final PDF)
 
 ---
 
-## Matcher: Scoring + WhatsApp Message Generation
+## Resume Tailor (tailor.py)
 
-Reads raw_jobs.json, calls DeepSeek once per job to score 1-5 against Pratyush profile.
-Writes shortlist.json (all jobs with scores) and whatsapp_message.txt (top 10 for WhatsApp).
+Calls Claude Sonnet 4 to tailor master resume to a specific JD. Output is plain text .txt file.
 
-### Scoring criteria (via DeepSeek prompt)
+### PP Resume Update Framework (governing rules)
 
-5 = Excellent: target role + strong company + matches background (consulting, marketplace, AI)
-4 = Good: role matches, strong company, minor gaps
-3 = Possible: role matches but company unclear OR SQL hard required
-2 = Weak: adjacent role or poor company fit
-1 = Skip
+1. Authentic reframing only -- never fabricate metrics or experiences
+2. Natural keyword integration -- weave JD keywords into existing bullet points
+3. ONE PAGE limit -- cut ruthlessly, never add filler
+4. Lead with strongest anchor for this role type:
+   - Marketplace/ops roles: Urban Company (unit economics, two-sided platform)
+   - Consulting-adjacent: Strategy& Dubai (C-suite, M&A, market entry)
+   - AI/product roles: Armor Defense + AI projects (SEC RAG, Spotify MCP)
+   - GTM/Sales Ops: Accenture B2B marketplace (1.2M SEA launch)
+5. Summary must mirror the JD language back at them
+6. Keep all real metrics -- they are the proof
+7. Education section always named "Education and Internships"
+8. Alice, New York internship always included (hardcoded verification in tailor.py)
+9. AI/Technical Personal Projects section included ONLY if company is AI-native OR JD mentions technical skills
+10. SQL requirements flagged at top with [SQL NOTE: required/preferred]
+
+### Alice internship protection
+
+tailor.py includes a post-generation verification step that checks if Alice NY internship
+is present in the output and injects it before Singapore Civil Defense Force if missing.
+Alice is also hardcoded in master_resume.txt as the source of truth.
+
+---
+
+## PDF Generator (generate_pdf.py)
+
+Converts tailored .txt to a formatted PDF using WeasyPrint.
+
+### Design spec (Clean Classic template)
+
+- Font: Carlito (metrically identical to Calibri, open source, installed via apt)
+- Body: 10pt, line-height 1.28-1.30
+- Margins: 0.5in top/bottom, 0.55in left/right
+- Name: 18pt bold, Arial/Carlito
+- Section headers: 9.5pt bold uppercase with bottom border rule
+- Company name: bold
+- Company location: plain text (split from company name at first comma)
+- Job title: italic, not bold
+- Dates: plain text, right-aligned, not bold
+- Bullets: disc style, 11pt left margin, 3pt text padding
+- Education: org bold, role italic, dates right-aligned
+- Links: LinkedIn (https://www.linkedin.com/in/pratyushpaul/) and GitHub (https://github.com/pratyushpaul93-coder)
+
+### 1-page enforcement
+
+generate_pdf.py automatically tries multiple CSS configurations to fit content to 1 page:
+1. line-height 1.28, font 10pt
+2. line-height 1.22, font 10pt
+3. line-height 1.16, font 10pt
+4. line-height 1.16, font 9.5pt
+5. line-height 1.12, font 9.5pt
+If still >1 page after all attempts: warns user that content needs trimming.
+
+### Dependencies
+
+WeasyPrint 68.1 (pip3 install weasyprint)
+libpango-1.0-0, libpangoft2-1.0-0, libpangocairo-1.0-0 (apt-get)
+fonts-crosextra-carlito (apt-get) -- Calibri clone
+
+---
+
+## Resume Files
+
+/root/pp-jobapp/resumes/
+  master_resume.txt              -- Source of truth for all tailoring
+  resume_meta.json               -- Metadata + key anchors per resume version
+  tailored/                      -- Generated tailored .txt files
+    YYYY-MM-DD_role_company.txt  -- Plain text tailored resume
+    YYYY-MM-DD_role_company.pdf  -- Final formatted PDF
+    YYYY-MM-DD_role_company.html -- Debug HTML (intermediate step)
 
 ---
 
 ## File Structure
 
 /root/pp-jobapp/
-  README.md                       -- this file
-  CAREER_OPS_LEARNINGS.md         -- learnings from career-ops repo + ATS API research
+  README.md                       -- this file (source of truth on VPS, pushed to GitHub)
+  CAREER_OPS_LEARNINGS.md         -- Learnings from career-ops repo + ATS API research
   scripts/
-    ats_scout.py                  -- ATS API scanner (25 companies, ~30 sec, zero LLM)
+    ats_scout.py                  -- ATS scanner (25 companies, ~30 sec, zero LLM)
     ats_matcher.py                -- DeepSeek scoring + WhatsApp message generation
-    dashboard.py                  -- Flask backend (serves dashboard_ui.html)
-    dashboard_ui.html             -- Dashboard frontend (job cards, comments, filters)
-    add_company.py                -- CLI to add company with ATS auto-detection (TODO)
-    vc_scanner.py                 -- Weekly VC portfolio scanner (TODO)
-    companies.json                -- Company list source of truth (TODO: migrate from hardcoded)
+    dashboard.py                  -- Flask backend
+    dashboard_ui.html             -- Dashboard frontend
+    tailor.py                     -- Claude Sonnet resume tailor
+    generate_pdf.py               -- WeasyPrint PDF generator (Clean Classic template)
+    add_company.py                -- TODO: CLI with ATS auto-detection
+    vc_scanner.py                 -- TODO: weekly VC portfolio scanner
+  resumes/
+    master_resume.txt             -- Master resume (source of truth)
+    resume_meta.json              -- Resume versions metadata
+    tailored/                     -- Tailored .txt, .pdf, .html files
   workspace/
-    raw_jobs.json                 -- Scout output, gitignored
-    shortlist.json                -- Matcher output, gitignored
-    comments.json                 -- Human feedback per job, gitignored
-    selected.json                 -- Dashboard selections, gitignored
-    whatsapp_message.txt          -- Generated WhatsApp shortlist, gitignored
+    raw_jobs.json                 -- Scout output (gitignored)
+    shortlist.json                -- Matcher output (gitignored)
+    comments.json                 -- Dashboard comments (gitignored)
+    selected.json                 -- Dashboard selections (gitignored)
+    whatsapp_message.txt          -- WhatsApp shortlist (gitignored)
+    tailored_resumes.json         -- Tracker of all tailored resumes (gitignored)
+    scan_status.json              -- Scan progress for dashboard button (gitignored)
+    tailor_status.json            -- Tailor progress for dashboard button (gitignored)
 
 ---
 
-## API Keys (in /root/.openclaw/openclaw.json)
+## API Keys (in /root/.openclaw/openclaw.json and agent auth-profiles)
 
-- Anthropic: Claude Sonnet 4.6 for Resume Tailor
-- DeepSeek: deepseek-chat for Matcher scoring (~$0.002/job)
+- Anthropic: Claude Sonnet 4 -- Resume Tailor
+  Location: /root/.openclaw/agents/job-scout/auth-profiles.json (anthropic:default key)
+- DeepSeek: deepseek-chat -- Matcher scoring (~$0.002/job)
+  Location: openclaw.json models.providers.deepseek.apiKey
 - Tavily: web search fallback for custom ATS companies
 - WhatsApp: linked to personal number (gateway pairing fix pending)
 
 ---
 
-## Known Issues
+## Known Issues / TODO
 
-1. Gateway pairing broken -- WhatsApp sends not working yet
-2. Broken ATS slugs: Cyera, Wiz, Figma, WandB (wrong platform or moved ATS)
-3. Duplicate listings: same role appearing 2-4x from ATS (dedup needed in Scout)
-4. Company list hardcoded in ats_scout.py (migrate to companies.json next session)
-5. Resume Tailor not yet wired to dashboard Tailor button
-
----
-
-## Next Session Priorities
-
-1. Fix WhatsApp gateway pairing so shortlist delivers to phone
-2. Wire Tailor button in dashboard to Resume Tailor agent
-3. Migrate company list to companies.json external config
-4. Build add_company.py CLI with ATS auto-detection
-5. Build Add Company button in dashboard UI
-6. Fix broken slugs: Cyera, Wiz, Figma, WandB
-7. Add deduplication to Scout output
-8. Push dashboard_ui.html to GitHub
+1. WhatsApp gateway pairing broken -- sends not working yet
+2. Broken ATS slugs: Cyera, Wiz, Figma (wrong platform or moved ATS)
+3. Company list hardcoded in ats_scout.py -- migrate to companies.json
+4. Resume Tailor button in dashboard not yet downloading PDF (shows status only)
+5. No deduplication in Scout output (same role can appear 2-4x from ATS)
+6. Resume review UI not built (planned: show draft in dashboard, add comments, revise, generate PDF)
 
 ---
 
@@ -195,22 +266,37 @@ Writes shortlist.json (all jobs with scores) and whatsapp_message.txt (top 10 fo
 ### Session 1 (April 6-7 2026)
 - Provisioned Hetzner CX21 VPS, installed OpenClaw
 - Connected WhatsApp, Tavily, DeepSeek, Anthropic APIs
-- Built initial Scout + Matcher as OpenClaw skills
+- Built initial Scout + Matcher as OpenClaw skills (later replaced with pure Python)
 
 ### Session 2 (April 7 2026)
 - Discovered Ashby/Greenhouse/Lever public JSON APIs (zero auth, zero hallucination)
-- Rebuilt Scout as pure Python script (ats_scout.py) -- 25 companies, 83 real jobs, ~30 seconds
-- Rebuilt Matcher as Python + DeepSeek (ats_matcher.py) -- 61 shortlisted, WhatsApp message generated
-- Read and documented career-ops learnings (CAREER_OPS_LEARNINGS.md)
+- Rebuilt Scout as pure Python (ats_scout.py) -- 25 companies, zero LLM
+- Rebuilt Matcher as Python + DeepSeek
 - Built Flask dashboard with job cards, comments, quick tags, filters
-- Created GitHub repo pp-openclaw-jobapp with SSH key auth from VPS
-- Established architecture principle: LLM only where reasoning needed
+- Created GitHub repo pp-openclaw-jobapp with SSH auth from VPS
+- Established architecture: LLM only where reasoning needed
+
+### Session 3 (April 8 2026)
+- Added posting date capture (publishedAt/updated_at/createdAt) to Scout
+- Dashboard updated: posting date badges, scan button states, tailor button, tailored badge
+- Added fresh filter pill (posted <14 days)
+- Built tailor.py: Claude Sonnet 4 resume tailoring against live JD
+- Built generate_pdf.py: WeasyPrint PDF generation (Clean Classic template)
+- PDF template: Carlito font, bold company, italic title, right-aligned dates
+- 1-page enforcement: auto-adjusts line-height and font-size across 5 attempts
+- Alice NY internship protection: hardcoded in master + verified post-generation
+- AI/Technical Personal Projects section: conditional display based on JD
+- Tailor endpoints added to dashboard API (/api/tailor, /api/tailor_status, /api/tailored_resumes)
+- Tailor quality: summary mirrors JD language, bullets reordered by relevance, keywords injected
 
 ## Key Design Decisions
 
-1. ATS JSON APIs > Playwright > WebSearch for job discovery (speed, reliability, zero hallucination)
-2. Pure Python for Scout -- no LLM, no hallucination risk, no API cost
-3. External companies.json as source of truth (not hardcoded) -- enables GUI/CLI/WhatsApp updates
-4. Dashboard comments feed back into Matcher scoring to improve quality over time
-5. Human-in-the-loop always: system never submits applications, Pratyush always decides
-6. Cost minimization: DeepSeek for scoring (~$0.002/job), Claude only for Resume Tailor
+1. ATS JSON APIs as primary source -- zero hallucination, no auth, no Playwright
+2. Pure Python for Scout -- no LLM, no API cost, runs in 30 seconds
+3. External companies.json as future source of truth (not yet migrated)
+4. Dashboard comments feed back into Matcher scoring over time
+5. Human-in-the-loop always -- system never submits applications
+6. Cost: DeepSeek for scoring, Claude only for resume tailoring
+7. 1-page resume enforcement via automatic CSS adjustment in generate_pdf.py
+8. Alice NY internship always present -- hardcoded protection against Claude omitting it
+9. Clean Classic resume template -- ATS-safe, Carlito/Calibri font, consulting-appropriate

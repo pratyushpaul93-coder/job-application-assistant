@@ -18,20 +18,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f5;
 .jobs{padding:10px 16px 70px;max-width:900px;margin:0 auto}
 .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:14px 16px;margin-bottom:10px}
 .card.sel{border:2px solid #1a7a55}
+.card.tailored{border-color:#2563eb}
 .top{display:flex;gap:10px;align-items:flex-start}
 .cb{width:20px;height:20px;border:1.5px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
 .cb.on{background:#1a7a55;border-color:#1a7a55}
 .info{flex:1;min-width:0}
 .title{font-size:14px;font-weight:600;margin-bottom:3px}
-.meta{font-size:12px;color:#777;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.meta{font-size:12px;color:#777;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;align-items:center}
 .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:600;margin-left:6px}
 .b5{background:#dcf5eb;color:#0a5c38}
 .b4{background:#dbeafe;color:#1e40af}
 .b3{background:#f3f4f6;color:#555}
 .sw{color:#b45309}.so{color:#166534}
-.acts{display:flex;gap:6px;flex-shrink:0}
-.btn{font-size:12px;padding:5px 10px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;text-decoration:none;color:#111;display:inline-block}
+.date-fresh{color:#166534;font-size:11px}
+.date-old{color:#b45309;font-size:11px}
+.date-stale{color:#991b1b;font-size:11px}
+.acts{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap}
+.btn{font-size:12px;padding:5px 10px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;text-decoration:none;color:#111;display:inline-block;white-space:nowrap}
 .grn{background:#1a7a55;color:#fff;border-color:#1a7a55}
+.blu{background:#2563eb;color:#fff;border-color:#2563eb}
 .reason{font-size:12px;color:#666;margin:8px 0 0 30px;line-height:1.5}
 .cmt{margin:8px 0 0 30px}
 textarea{width:100%;font-size:12px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;background:#fafafa;color:#111;resize:vertical;font-family:inherit}
@@ -43,17 +48,21 @@ textarea:focus{outline:none;border-color:#1a7a55}
 .tag.good{background:#f0fdf4;color:#166534;border-color:#86efac}
 .tag.act{font-weight:700}
 .bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e5e5;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;z-index:10}
+.toast{position:fixed;top:60px;right:16px;background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;z-index:100;display:none}
+.tailor-status{font-size:11px;color:#2563eb;margin-left:6px;display:none}
 @media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.acts{display:none}}
 </style>
 </head>
 <body>
 <div class="hdr">
   <div><div style="font-size:16px;font-weight:600">Job pipeline</div><div style="font-size:12px;color:#888;margin-top:2px" id="meta">Loading...</div></div>
-  <div style="display:flex;gap:8px">
-    <button class="btn" onclick="runScan()">Run scan</button>
-    <button class="btn grn" onclick="alert('WhatsApp coming next session')">Send to WhatsApp</button>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="tailor-status" class="tailor-status"></span>
+    <button class="btn" id="scan-btn" onclick="runScan()">Run scan</button>
+    <button class="btn grn" onclick="alert('WhatsApp gateway pairing pending')">WhatsApp</button>
   </div>
 </div>
+<div class="toast" id="toast"></div>
 <div class="stats">
   <div class="stat"><div class="stat-l">Total scanned</div><div class="stat-n" id="st0">-</div></div>
   <div class="stat"><div class="stat-l">Shortlisted</div><div class="stat-n" id="st1">-</div></div>
@@ -67,28 +76,48 @@ textarea:focus{outline:none;border-color:#1a7a55}
   <span class="pill" data-f="3" onclick="setF(this)">3/5</span>
   <span class="pill" data-f="sel" onclick="setF(this)">Selected</span>
   <span class="pill" data-f="com" onclick="setF(this)">Commented</span>
+  <span class="pill" data-f="fresh" onclick="setF(this)">Posted &lt;14d</span>
+  <span class="pill" data-f="tailored" onclick="setF(this)">Tailored</span>
   <input class="srch" placeholder="Search..." oninput="doSearch(this.value)">
 </div>
 <div class="jobs" id="list"></div>
 <div class="bar">
   <span style="font-size:13px;color:#555"><span id="bsel">0</span> selected</span>
   <div style="display:flex;gap:8px">
-    <button class="btn" onclick="alert('Resume Tailor coming next session')">Tailor all</button>
-    <button class="btn grn" onclick="alert('WhatsApp coming next session')">Send to WhatsApp</button>
+    <button class="btn" onclick="tailorSelected()">Tailor selected</button>
+    <button class="btn grn" onclick="alert('WhatsApp coming soon')">Send to WhatsApp</button>
   </div>
 </div>
 <script>
-var jobs=[],comments={},selected=new Set(),filter='all',q='';
+var jobs=[],comments={},selected=new Set(),filter='all',q='',tailoredUrls=new Set();
 var TAGS=['Apply now','Maybe later','SQL blocker','Too senior','Wrong vertical','Location issue'];
+
+function showToast(msg,ms){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.style.display='block';
+  setTimeout(function(){t.style.display='none';},ms||2500);
+}
+
+function dateLabel(daysAgo){
+  if(daysAgo===null||daysAgo===undefined)return '';
+  if(daysAgo<=7)return '<span class="date-fresh">'+daysAgo+'d ago</span>';
+  if(daysAgo<=14)return '<span class="date-fresh">'+daysAgo+'d ago</span>';
+  if(daysAgo<=30)return '<span class="date-old">'+daysAgo+'d ago</span>';
+  return '<span class="date-stale">'+daysAgo+'d ago</span>';
+}
+
 async function load(){
   var r=await fetch('/api/data');
   var d=await r.json();
   jobs=d.jobs||[];comments=d.comments||{};selected=new Set(d.selected||[]);
-  document.getElementById('meta').textContent='Last scan: '+d.scan_date+' — '+d.companies+' companies';
+  document.getElementById('meta').textContent='Last scan: '+d.scan_date+' | '+d.companies+' companies';
   document.getElementById('st0').textContent=d.total_scanned||0;
   document.getElementById('st1').textContent=d.total_shortlisted||0;
+  var tr=await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
+  tailoredUrls=new Set(tr.map(function(t){return t.job_url;}));
   render();
 }
+
 function render(){
   var list=document.getElementById('list');
   var shown=jobs.filter(function(j){
@@ -96,6 +125,8 @@ function render(){
     if(filter==='4'&&j.match_score!==4)return false;
     if(filter==='3'&&j.match_score!==3)return false;
     if(filter==='sel'&&!selected.has(j.job_url))return false;
+    if(filter==='fresh'&&(j.days_ago===null||j.days_ago===undefined||j.days_ago>14))return false;
+    if(filter==='tailored'&&!tailoredUrls.has(j.job_url))return false;
     if(filter==='com'){var c=comments[j.job_url];if(!c||(!c.text&&(!c.tags||!c.tags.length)))return false;}
     if(q&&!(j.role_title+j.company_name).toLowerCase().includes(q))return false;
     return true;
@@ -103,11 +134,13 @@ function render(){
   var html='';
   for(var i=0;i<shown.length;i++){
     var j=shown[i];var k=j.job_url;var isSel=selected.has(k);
+    var isTailored=tailoredUrls.has(k);
     var c=comments[k]||{text:'',tags:[]};var sc=j.match_score;
     var bc=sc===5?'b5':sc===4?'b4':'b3';
     var loc=j.remote_ok?'Remote':(j.location_raw||'?');
-    var sqlH=j.sql_required?'<span class="sw">SQL required</span>':j.sql_mentioned?'<span class="sw">SQL mentioned</span>':'<span class="so">no SQL</span>';
+    var sqlH=j.sql_required?'<span class="sw">SQL req</span>':j.sql_mentioned?'<span class="sw">SQL mentioned</span>':'<span class="so">no SQL</span>';
     var ek=JSON.stringify(k);
+    var dateH=dateLabel(j.days_ago);
     var tH='<span class="tl">Tags:</span>';
     for(var t=0;t<TAGS.length;t++){
       var tg=TAGS[t];
@@ -115,12 +148,14 @@ function render(){
       var ta=(c.tags||[]).indexOf(tg)>=0?' act':'';
       tH+='<span class="'+tc+ta+'" onclick="toggleTag('+ek+','+JSON.stringify(tg)+')">'+tg+'</span>';
     }
-    html+='<div class="card'+(isSel?' sel':'')+'"><div class="top">';
+    var cardCls='card'+(isSel?' sel':'')+(isTailored?' tailored':'');
+    html+='<div class="'+cardCls+'"><div class="top">';
     html+='<div class="cb'+(isSel?' on':'')+'" onclick="toggleSel('+ek+')">'+(isSel?'&#10003;':'')+'</div>';
-    html+='<div class="info"><div class="title">'+j.role_title+'<span class="badge '+bc+'">'+sc+'/5</span></div>';
-    html+='<div class="meta"><span>'+j.company_name+'</span><span>'+loc+'</span><span>'+j.company_stage+'</span><span>'+j.industry_vertical+'</span>'+sqlH+'</div></div>';
+    html+='<div class="info"><div class="title">'+j.role_title+'<span class="badge '+bc+'">'+sc+'/5</span>'+(isTailored?'<span style="font-size:11px;color:#2563eb;margin-left:6px">&#10003; tailored</span>':'')+'</div>';
+    html+='<div class="meta"><span>'+j.company_name+'</span><span>'+loc+'</span><span>'+j.company_stage+'</span>'+dateH+sqlH+'</div></div>';
     html+='<div class="acts"><a class="btn" href="'+j.apply_url+'" target="_blank">Apply</a>';
-    html+='<button class="btn grn">Tailor</button></div></div>';
+    html+='<button class="btn '+(isTailored?'blu':'grn')+'" onclick="tailorJob('+ek+','+JSON.stringify(j.role_title)+','+JSON.stringify(j.company_name)+')">'+(isTailored?'Re-tailor':'Tailor')+'</button></div>';
+    html+='</div>';
     html+='<div class="reason">'+(j.reason||'')+'</div>';
     html+='<div class="cmt"><textarea rows="1" placeholder="Add notes..." onchange="saveCmt('+ek+',this.value)">'+(c.text||'')+'</textarea>';
     html+='<div class="tags">'+tH+'</div></div></div>';
@@ -130,17 +165,20 @@ function render(){
   document.getElementById('st3').textContent=Object.values(comments).filter(function(c){return c.text||(c.tags&&c.tags.length);}).length;
   document.getElementById('bsel').textContent=selected.size;
 }
+
 function toggleSel(k){
   if(selected.has(k)){selected.delete(k);}else{selected.add(k);}
   fetch('/api/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,selected:selected.has(k)})});
   render();
 }
+
 function saveCmt(k,text){
   if(!comments[k])comments[k]={text:'',tags:[]};
   comments[k].text=text;
   fetch('/api/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,text:text,tags:comments[k].tags||[]})});
   render();
 }
+
 function toggleTag(k,tag){
   if(!comments[k])comments[k]={text:'',tags:[]};
   var tags=comments[k].tags||[];
@@ -150,9 +188,69 @@ function toggleTag(k,tag){
   fetch('/api/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,text:comments[k].text||'',tags:tags})});
   render();
 }
+
 function setF(el){document.querySelectorAll('.pill').forEach(function(p){p.classList.remove('on');});el.classList.add('on');filter=el.dataset.f;render();}
 function doSearch(v){q=v.toLowerCase();render();}
-function runScan(){if(confirm('Run fresh scan? Takes ~2 min.')){fetch('/api/scan',{method:'POST'});alert('Scan started! Refresh in 2 min.');}}
+
+function tailorJob(k,title,company){
+  var job=jobs.find(function(j){return j.job_url===k;});
+  if(!job)return;
+  var ts=document.getElementById('tailor-status');
+  ts.style.display='inline';ts.textContent='Tailoring '+company+'...';
+  fetch('/api/tailor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({job_url:job.apply_url,role_title:title,company_name:company})});
+  showToast('Tailoring started for '+title+' @ '+company+'. Takes ~30 seconds.',4000);
+  pollTailorStatus();
+}
+
+function tailorSelected(){
+  var sel=jobs.filter(function(j){return selected.has(j.job_url);});
+  if(!sel.length){showToast('No jobs selected');return;}
+  if(!confirm('Tailor resumes for '+sel.length+' selected jobs?'))return;
+  sel.forEach(function(j){tailorJob(j.job_url,j.role_title,j.company_name);});
+}
+
+function pollTailorStatus(){
+  var interval=setInterval(async function(){
+    var r=await fetch('/api/tailor_status');
+    var s=await r.json();
+    var ts=document.getElementById('tailor-status');
+    if(s.status==='done'){
+      ts.textContent='';ts.style.display='none';
+      showToast('Resume tailored! Check /root/pp-jobapp/resumes/tailored/',4000);
+      var tr=await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
+      tailoredUrls=new Set(tr.map(function(t){return t.job_url;}));
+      render();
+      clearInterval(interval);
+    } else if(s.status==='error'){
+      ts.textContent='Tailor error';
+      showToast('Tailor error: '+s.error,5000);
+      clearInterval(interval);
+    }
+  },3000);
+}
+
+var scanPolling=null;
+function runScan(){
+  var btn=document.getElementById('scan-btn');
+  btn.textContent='Scanning...';btn.disabled=true;btn.style.opacity='0.6';
+  fetch('/api/scan',{method:'POST'});
+  showToast('Scan started - takes ~2 minutes',4000);
+  scanPolling=setInterval(async function(){
+    var r=await fetch('/api/scan_status');
+    var s=await r.json();
+    if(s.status==='done'){
+      btn.textContent='Scan ready';btn.disabled=false;btn.style.opacity='1';
+      btn.style.background='#1a7a55';btn.style.color='#fff';btn.style.borderColor='#1a7a55';
+      showToast('Scan complete! Refreshing data...',3000);
+      clearInterval(scanPolling);
+      setTimeout(function(){
+        btn.textContent='Run scan';btn.style.background='';btn.style.color='';btn.style.borderColor='';
+        load();
+      },3000);
+    }
+  },5000);
+}
+
 load();
 </script>
 </body>
