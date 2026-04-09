@@ -150,7 +150,7 @@ function render(){
     var bc=sc===5?'b5':sc===4?'b4':'b3';
     var loc=j.remote_ok?'Remote':(j.location_raw||'?');
     var sqlH=j.sql_required?'<span class="sw">SQL req</span>':j.sql_mentioned?'<span class="sw">SQL mentioned</span>':'<span class="so">no SQL</span>';
-    var ek=JSON.stringify(k);
+    var ek="'" + k + "'";
     var dateH=dateLabel(j.days_ago);
     var tH='<span class="tl">Tags:</span>';
     for(var t=0;t<TAGS.length;t++){
@@ -165,13 +165,12 @@ function render(){
     html+='<div class="info"><div class="title">'+j.role_title+'<span class="badge '+bc+'">'+sc+'/5</span>'+(isTailored?'<span style="font-size:11px;color:#2563eb;margin-left:6px">&#10003; tailored</span>':'')+'</div>';
     html+='<div class="meta"><span>'+j.company_name+'</span><span>'+loc+'</span><span>'+j.company_stage+'</span>'+dateH+sqlH+'</div></div>';
     html+='<div class="acts"><a class="btn" href="'+j.apply_url+'" target="_blank">Apply</a><a class="btn" href="'+j.apply_url+'" target="_blank">View JD</a>';
-    html+='<button class="btn '+(isTailored?'blu':'grn')+'" onclick="tailorOrView('+ek+','+i+','+JSON.stringify(j.role_title)+','+JSON.stringify(j.company_name)+')">'+(isTailored?'Review / Re-tailor':'Tailor')+'</button></div>';
+    html+='<button class="btn '+(isTailored?'blu':'grn')+'" onclick="tailorOrView(this)" data-key="'+k+'" data-idx="'+i+'" data-role="'+j.role_title.replace(/&/g,'and')+'" data-company="'+j.company_name.replace(/&/g,'and')+'">'+(isTailored?'Review / Re-tailor':'Tailor')+'</button></div>';
     html+='</div>';
     html+='<div class="reason">'+(j.reason||'')+'</div>';
     html+='<div class="cmt"><textarea rows="1" placeholder="Add notes..." onchange="saveCmt('+ek+',this.value)">'+(c.text||'')+'</textarea>';
     html+='<div class="tags">'+tH+'</div></div>';
-    var rp=tailoredFiles[k]||null;
-    html+='<div class="review-panel" id="rp-'+i+'">';
+    html+='<div class="review-panel" id="rp-'+i+'" style="display:none">';
     html+='<div class="review-tabs">';
     html+='<div class="review-tab active" onclick="switchTab('+i+',\'draft\',this)">Draft</div>';
     html+='<div class="review-tab" onclick="switchTab('+i+',\'revise\',this)">Revise</div>';
@@ -286,7 +285,11 @@ function runScan(){
 
 load();
 
-function tailorOrView(k, idx, title, company) {
+function tailorOrView(el) {
+  var k = el.dataset.key;
+  var idx = el.dataset.idx;
+  var title = el.dataset.role;
+  var company = el.dataset.company;
   var rp = document.getElementById('rp-'+idx);
   if (!rp) return;
   // If already tailored and panel closed, open it to show draft
