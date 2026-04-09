@@ -9,7 +9,7 @@
 ## Overall Objective
 
 Automate the end-to-end job search pipeline for Pratyush Paul.
-- Phase 1 (complete): Scout jobs via ATS APIs, score with DeepSeek, review in dashboard, tailor resumes to PDF
+- Phase 1 (in progress): Scout jobs via ATS APIs, score with DeepSeek, review in dashboard, tailor resumes to PDF
 - Phase 2 (next): WhatsApp delivery, auto-apply, LinkedIn outreach automation
 
 ## Target Roles
@@ -114,6 +114,7 @@ Accessible at http://87.99.133.98:5000. Runs as systemd service (pp-dashboard), 
 - Job cards: score badge, company, location, stage, posting date (color-coded freshness), SQL flag
 - Checkbox to select jobs for application
 - Apply button (direct ATS link)
+- View JD button (opens apply_url in new tab)
 - Tailor button: fires tailor.py, shows "Tailoring..." status, polls until done
 - Tailored badge on completed resumes (blue outline + check mark)
 - Re-tailor option to regenerate
@@ -121,13 +122,24 @@ Accessible at http://87.99.133.98:5000. Runs as systemd service (pp-dashboard), 
 - Quick tags: Apply now, Maybe later, SQL blocker, Too senior, Wrong vertical, Location issue
 - Scan button with states: "Run scan" -> "Scanning..." -> "Scan ready" (auto-reloads data)
 - Bulk actions: Tailor selected, Send to WhatsApp
+- Resume review panel: Draft tab (shows .txt content), Revise tab (comment box + Apply comments), Generate PDF button, inline Download link
+
+### Dashboard API endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| /api/tailor | POST | Trigger tailor.py for a job, returns job_key |
+| /api/tailor_status | GET | Poll tailor progress (status, filename) |
+| /api/tailored_resumes | GET | List all tailored resume filenames |
+| /api/revise | POST | Takes filename + comments, calls Claude to revise .txt in place |
+| /api/generate_pdf | POST | Runs generate_pdf.py on a .txt file, returns pdf_filename |
+| /api/download_pdf | GET | Serves PDF file as download |
 
 ### Planned features
 
 - Add Company button with ATS auto-detection
-- Download PDF button per tailored resume
+- Fix review panel Tailor button wiring (tailorOrView() built but anchor string mismatch -- see Known Issues)
 - Application history tracker (dedup against prior applications)
-- Resume review panel in UI (show draft, add comments, apply revisions, generate final PDF)
 
 ---
 
@@ -147,16 +159,37 @@ Calls Claude Sonnet 4 to tailor master resume to a specific JD. Output is plain 
    - GTM/Sales Ops: Accenture B2B marketplace (1.2M SEA launch)
 5. Summary must mirror the JD language back at them
 6. Keep all real metrics -- they are the proof
-7. Education section always named "Education and Internships"
+7. Education section always named "Education and Other Experiences"
 8. Alice, New York internship always included (hardcoded verification in tailor.py)
 9. AI/Technical Personal Projects section included ONLY if company is AI-native OR JD mentions technical skills
 10. SQL requirements flagged at top with [SQL NOTE: required/preferred]
+11. Armor Defense hardcoded to exactly 3 bullets -- never invent a 4th
+12. Company order enforced: Armor Defense, Strategy&, Urban Company, Accenture (never reorder)
+13. Section order enforced: SUMMARY -> CORE EXPERIENCE -> AI/TECHNICAL PROJECTS -> EDUCATION AND OTHER EXPERIENCES
+14. Agency partnerships bullet always included; method/how never stripped from bullets
+
+### Resume library context
+
+tailor.py loads /root/pp-jobapp/resumes/resume_library.txt (up to 15000 chars) as context.
+Library contains 12 versions: BASELINE, GOOGLE, SALESFORCE, ASANA, SUNO, UBER MEMBERSHIPS,
+TECH STRAT AND PLANNING, WIZ GTM ANALYST, GRAINGER, HARVEY, TURO, EBAY.
+Each version has verbatim bullets, [UNIQUE] tags, applied-to info, outcome, and tailor instructions.
 
 ### Alice internship protection
 
 tailor.py includes a post-generation verification step that checks if Alice NY internship
-is present in the output and injects it before Singapore Civil Defense Force if missing.
-Alice is also hardcoded in master_resume.txt as the source of truth.
+is present in the output and injects it (along with Singapore Civil Defense Force line)
+before the education section if missing. Both lines are hardcoded in master_resume.txt.
+
+### tailor.py usage
+
+python3 scripts/tailor.py <job_url> <role_title> <company_name> [version_suffix]
+
+Example:
+python3 scripts/tailor.py 'https://jobs.ashbyhq.com/harvey/abc123' 'GTM Strategy and Operations' 'Harvey' 'v17'
+
+Note: Ashby and Greenhouse render as JS SPAs -- tailor.py fetches the URL directly.
+If JD content is blank, paste JD text manually into a .txt file and pass as job_url with file:// prefix.
 
 ---
 
@@ -175,9 +208,10 @@ Converts tailored .txt to a formatted PDF using WeasyPrint.
 - Company location: plain text (split from company name at first comma)
 - Job title: italic, not bold
 - Dates: plain text, right-aligned, not bold
-- Bullets: disc style, 11pt left margin, 3pt text padding
+- Bullets: disc style, 11pt left margin, 3pt text padding, list-style-position: inside
 - Education: org bold, role italic, dates right-aligned
 - Links: LinkedIn (https://www.linkedin.com/in/pratyushpaul/) and GitHub (https://github.com/pratyushpaul93-coder)
+- Education section header hardcoded on line 63: "Education and Other Experiences"
 
 ### 1-page enforcement
 
@@ -201,6 +235,7 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 
 /root/pp-jobapp/resumes/
   master_resume.txt              -- Source of truth for all tailoring
+  resume_library.txt             -- 12 prior resume versions with [UNIQUE] tags and tailor instructions (15000 char context window)
   resume_meta.json               -- Metadata + key anchors per resume version
   tailored/                      -- Generated tailored .txt files
     YYYY-MM-DD_role_company.txt  -- Plain text tailored resume
@@ -219,12 +254,13 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
     ats_matcher.py                -- DeepSeek scoring + WhatsApp message generation
     dashboard.py                  -- Flask backend
     dashboard_ui.html             -- Dashboard frontend
-    tailor.py                     -- Claude Sonnet resume tailor
-    generate_pdf.py               -- WeasyPrint PDF generator (Clean Classic template)
+    tailor.py                     -- Claude Sonnet 4 resume tailor (library context, anti-fabrication rules)
+    generate_pdf.py               -- WeasyPrint PDF generator (Clean Classic template, line 63 hardcoded)
     add_company.py                -- TODO: CLI with ATS auto-detection
     vc_scanner.py                 -- TODO: weekly VC portfolio scanner
   resumes/
     master_resume.txt             -- Master resume (source of truth)
+    resume_library.txt            -- Prior resume versions for tailor context (12 versions, 15000 char limit)
     resume_meta.json              -- Resume versions metadata
     tailored/                     -- Tailored .txt, .pdf, .html files
   workspace/
@@ -250,79 +286,16 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 
 ---
 
-
-### Session 4 (April 8 2026)
-
-#### Resume Library Built
-- Built `/root/pp-jobapp/resumes/resume_library.txt` — structured text file with 12 resume versions
-- Each version has: full verbatim bullets, summary, unique strengths callouts, [UNIQUE] tags on distinctive bullets, applied-to info, outcome, and tailor instructions
-- Versions in library: BASELINE, GOOGLE, SALESFORCE, ASANA, SUNO, UBER MEMBERSHIPS, TECH STRAT AND PLANNING, WIZ GTM ANALYST, GRAINGER, HARVEY, TURO, EBAY
-- Library context injected into tailor.py prompt (15000 char limit, up from 3000)
-- Tailor instructions at bottom of library file guide which version to use as base for each role type
-
-#### Master Resume Updates
-- Accenture B2B bullet: added detail (competitor analysis, target store segmentation, assortment, sourcing, pricing, operations)
-- Accenture FMCG bullet: replaced with new demand forecasting bullet — "Created demand forecasting model for global shipping giant to better allocate empty containers for sales across 300+ ports worldwide, improving forecasting efficiency by 1% and generating ~$4M in annual savings"
-- AI/Technical Projects: renamed PP OpenClaw Pipeline to "OpenClaw Job Hunting Pipeline", updated to 100+ companies
-- AI/Technical Projects: updated SEC EDGAR and Spotify descriptions to be more concise and descriptive
-- Education section header: changed from "EDUCATION AND INTERNSHIPS" to "EDUCATION AND OTHER EXPERIENCES" in master + generate_pdf.py line 63
-
-#### tailor.py Improvements
-- Library truncation fixed: 3000 -> 15000 chars
-- Version suffix support: now accepts optional 4th arg for versioning (e.g. 'v9', 'v10')
-- Anti-fabrication rules added: Armor Defense hardcoded to exactly 3 bullets, never invent a 4th
-- Anti-compression rules: never remove method/how from bullets, never drop metrics, agency partnerships bullet always included
-- Section order enforced: SUMMARY -> CORE EXPERIENCE -> AI/TECHNICAL PROJECTS -> EDUCATION AND OTHER EXPERIENCES
-- Company order enforced: Armor Defense, Strategy&, Urban Company, Accenture (never reorder)
-- Education header rule: always output "EDUCATION AND OTHER EXPERIENCES"
-- Alice + Civil Defense injection: both lines always guaranteed present in output
-
-#### generate_pdf.py Improvements
-- Education header rewrite (line 63): hardcoded display now says "Education and Other Experiences"
-- SECTIONS list updated: "EDUCATION AND OTHER EXPERIENCES" added as recognized section
-- Bullet CSS: list-style-position: inside with margin-left 11pt and padding-left 5pt (v12 baseline — known good)
-
-#### Harvey Resume — Version History
-- v1-v8: Earlier sessions, iterating on formatting and content
-- v9: First run with library context (15000 chars), Ashby JD fetched successfully (6000 chars)
-- v10: Fixed library truncation + version suffix support
-- v11: Added anti-fabrication + anti-compression rules, bullet CSS fix attempt
-- v12: Best formatting baseline — bullets correct, all content present except Civil Defense + AI projects section order
-- v13: Civil Defense injection fixed, Education header attempted
-- v14: Section order enforced (broke company order — reverted)
-- v15: Rollback attempt
-- v16: Education header fixed in tailor.py + SECTIONS list, AI/Technical Projects above Education
-- v17: Line 63 hardcoded fix — Education and Other Experiences confirmed correct. Civil Defense present. Best version to date.
-
-#### Dashboard UI — Review Panel Built (partially wired)
-- 3 new backend endpoints added to dashboard.py:
-  - POST /api/revise — takes filename + comments, calls Claude to revise .txt in place
-  - POST /api/generate_pdf — runs generate_pdf.py on a .txt file, returns pdf_filename
-  - GET /api/download_pdf — serves PDF file as download
-- View JD button added to each job card (opens apply_url in new tab)
-- Review panel HTML built — Draft tab (shows .txt content), Revise tab (comment box + Apply comments button)
-- Generate PDF button + inline Download link in review panel
-- tailorOrView() function built — opens panel if tailored, re-tails if panel already open
-- TODO next session: fix button wiring (tailorOrView not connected to Tailor button — anchor string mismatch)
-- TODO next session: test full end-to-end flow: Tailor -> Review draft -> Add comments -> Apply -> Generate PDF -> Download
-
-#### Known Issues / Next Session TODO
-1. Dashboard review panel button wiring broken — tailorOrView() built but Tailor button still calls tailorJob() directly
-2. Floating bullet dots in AI/Technical Projects section of PDF — WeasyPrint rendering artifact, different HTML structure from CORE EXPERIENCE bullets
-3. Push all session 4 changes to GitHub
-4. Test full review panel flow end-to-end once button is wired
-5. Consider adding: applied_history.json tracker to flag already-applied companies in Scout results
-
----
-
 ## Known Issues / TODO
 
-1. WhatsApp gateway pairing broken -- sends not working yet
-2. Broken ATS slugs: Cyera, Wiz, Figma (wrong platform or moved ATS)
-3. Company list hardcoded in ats_scout.py -- migrate to companies.json
-4. Resume Tailor button in dashboard not yet downloading PDF (shows status only)
-5. No deduplication in Scout output (same role can appear 2-4x from ATS)
-6. Resume review UI not built (planned: show draft in dashboard, add comments, revise, generate PDF)
+1. Dashboard review panel button wiring broken -- tailorOrView() built but Tailor button still calls tailorJob() directly (anchor string mismatch). Fix: wire Tailor button to tailorOrView() and test full end-to-end: Tailor -> Review draft -> Add comments -> Apply revisions -> Generate PDF -> Download
+2. Floating bullet dots in AI/Technical Projects section of PDF -- WeasyPrint rendering artifact, different HTML structure from CORE EXPERIENCE bullets
+3. Push all Session 4 changes to GitHub (pending confirmation)
+4. WhatsApp gateway pairing broken -- sends not working yet
+5. Broken ATS slugs: Cyera, Wiz, Figma, WandB (wrong platform or moved ATS)
+6. Company list hardcoded in ats_scout.py -- migrate to companies.json
+7. No deduplication in Scout output (same role can appear 2-4x from ATS)
+8. Add applied_history.json tracker to flag already-applied companies in Scout results
 
 ---
 
@@ -354,6 +327,19 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 - Tailor endpoints added to dashboard API (/api/tailor, /api/tailor_status, /api/tailored_resumes)
 - Tailor quality: summary mirrors JD language, bullets reordered by relevance, keywords injected
 
+### Session 4 (April 8 2026)
+- Built resume_library.txt: 12 versions with [UNIQUE] tags, outcomes, tailor instructions
+- Library context injected into tailor.py prompt (15000 char limit, up from 3000)
+- Master resume updates: Accenture B2B bullet expanded, FMCG bullet replaced with demand forecasting ($4M savings), OpenClaw pipeline renamed, SEC EDGAR + Spotify descriptions updated
+- Education header changed to "Education and Other Experiences" everywhere: master_resume.txt, tailor.py (rule + section order enforcement), generate_pdf.py line 63, SECTIONS list
+- tailor.py: version suffix support (optional 4th arg), anti-fabrication rules (Armor Defense = exactly 3 bullets), anti-compression rules (never drop metrics or method), company order and section order enforced, Civil Defense injection guaranteed
+- generate_pdf.py: bullet CSS baseline set (v12: list-style-position inside, margin-left 11pt, padding-left 5pt)
+- Harvey resume iterated through v1-v17; v17 is best version to date
+- Dashboard: View JD button added, review panel built (Draft tab, Revise tab, Generate PDF, Download link), three new API endpoints (/api/revise, /api/generate_pdf, /api/download_pdf)
+- tailorOrView() function built but not yet wired to Tailor button (TODO next session)
+
+---
+
 ## Key Design Decisions
 
 1. ATS JSON APIs as primary source -- zero hallucination, no auth, no Playwright
@@ -365,3 +351,4 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 7. 1-page resume enforcement via automatic CSS adjustment in generate_pdf.py
 8. Alice NY internship always present -- hardcoded protection against Claude omitting it
 9. Clean Classic resume template -- ATS-safe, Carlito/Calibri font, consulting-appropriate
+10. Resume library context in tailor.py -- 12 prior versions guide tone, anchor selection, and keyword patterns
