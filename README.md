@@ -352,3 +352,37 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 8. Alice NY internship always present -- hardcoded protection against Claude omitting it
 9. Clean Classic resume template -- ATS-safe, Carlito/Calibri font, consulting-appropriate
 10. Resume library context in tailor.py -- 12 prior versions guide tone, anchor selection, and keyword patterns
+
+---
+
+## Prioritized TODO List (Updated April 13 2026)
+
+### P1 — Do Next Session
+
+1. **Manual Tailor pipeline** — paste any JD URL or raw text + role + company into dashboard, trigger tailor.py directly bypassing Scout/Matcher. Need: new `/api/tailor_manual` endpoint in dashboard.py, `--jd-text` flag in tailor.py, and a "Manual Tailor" panel in dashboard_ui.html
+2. **Dashboard review panel button** — verify tailorOrView() wiring (line 230/261/273 in dashboard_ui.html). Need to see full tailorOrView() function + tailor endpoint output before fixing. Commands ready: `sed -n '60,90p' scripts/dashboard.py` and `sed -n '255,345p' scripts/dashboard_ui.html`
+3. **Add Company manually** — fully functioning flow: type company name → auto-detect ATS (Ashby/Greenhouse/Lever) → verify slug → append to company list in ats_scout.py. Backend endpoint + dashboard UI button.
+
+### P2 — Next Few Sessions
+
+4. **Git push** — 1 commit ahead of origin/main + unstaged changes in dashboard.py and dashboard_ui.html + resumes/tailored/ untracked. Run: `cd /root/pp-jobapp && git add scripts/dashboard.py scripts/dashboard_ui.html resumes/tailored/ && git commit -m "Session 4-5 updates" && git push`
+5. **Broken ATS slugs** — fix Cyera, Wiz, Figma, WandB (wrong platform or slug moved)
+6. **PDF floating bullet dots** — WeasyPrint rendering artifact in AI/Technical Projects section
+7. **Scout deduplication** — same role appearing 2-4x in raw_jobs.json output
+
+### P3 — Backlog
+
+8. **Migrate company list to companies.json** — currently hardcoded in ats_scout.py
+9. **applied_history.json tracker** — flag already-applied companies in Scout/dashboard
+10. **WhatsApp gateway pairing** — sends still broken
+11. **Improvement loops for Tailor/Matcher/Scout** — feed non-standard applications (e.g. United Airlines, non-SaaS roles) as signal to improve scoring rubric and resume anchors over time
+12. **Add Wellfound / BuiltIn / YC as Scout sources**
+13. **Cleanup OpenClaw-dropped files** — AGENTS.md, IDENTITY.md, SOUL.md, TOOLS.md, USER.md, HEARTBEAT.md should be gitignored or deleted
+
+### Session 5 Context (April 13 2026)
+
+- Cron ran successfully today at 13:00 UTC — raw_jobs.json (52K) and shortlist.json (51K) both fresh
+- Dashboard running on PID 117134 (up since Apr 11)
+- tailorOrView() appears wired at line 230 but needs verification — did not get to test review panel this session
+- tailor.py currently accepts: job_url, role_title, company_name (3 args only, no version suffix passed from dashboard)
+- Full tailor.py and dashboard code NOT yet pulled this session — pull before building
