@@ -61,7 +61,7 @@ Scout captures posted_date and days_ago for every job. Dashboard shows color-cod
 - Amber: 15-30 days
 - Red: 30+ days (stale, deprioritize)
 
-### Verified company slugs (25 companies)
+### Verified company slugs (45 companies)
 
 Ashby: ramp, notion, vanta, harvey, elevenlabs, cohere, langchain, pinecone, sierra, linear, zapier, n8n
 Greenhouse: gleanwork, brex, airtable, vercel, intercom, anthropic, wizsecurity
@@ -119,7 +119,8 @@ Accessible at http://87.99.133.98:5000. Runs as systemd service (pp-dashboard), 
 - Tailored badge on completed resumes (blue outline + check mark)
 - Re-tailor option to regenerate
 - Free text comment per job (saved to comments.json, feeds Matcher scoring)
-- Quick tags: Apply now, Maybe later, SQL blocker, Too senior, Wrong vertical, Location issue
+- Mark Reviewed and Mark Applied buttons per job card, state persists across page refreshes
+- Reviewed and Applied dropdown filter selects (All / Yes / No) in filter bar
 - Scan button with states: "Run scan" -> "Scanning..." -> "Scan ready" (auto-reloads data)
 - Bulk actions: Tailor selected, Send to WhatsApp
 - Resume review panel: Draft tab (shows .txt content), Revise tab (comment box + Apply comments), Generate PDF button, inline Download link
@@ -132,13 +133,13 @@ Accessible at http://87.99.133.98:5000. Runs as systemd service (pp-dashboard), 
 | /api/tailor_status | GET | Poll tailor progress (status, filename) |
 | /api/tailored_resumes | GET | List all tailored resume filenames |
 | /api/revise | POST | Takes filename + comments, calls Claude to revise .txt in place |
-| /api/generate_pdf | POST | Runs generate_pdf.py on a .txt file, returns pdf_filename |
-| /api/download_pdf | GET | Serves PDF file as download |
+| /api/generate_pdf | POST | Runs generate_pdf.py on a .txt file, returns pdf_filename (PPaul naming convention) |
+| /api/download_pdf | GET | Regenerates PDF from latest .txt before serving, serves as download |
+| /api/job_status | POST | Persist reviewed/applied state per job to job_status.json |
+| /api/companies/delete | POST | Remove company from COMPANIES list + clean jobs from workspace JSONs |
 
 ### Planned features
 
-- Add Company button with ATS auto-detection
-- Fix review panel Tailor button wiring (tailorOrView() built but anchor string mismatch -- see Known Issues)
 - Application history tracker (dedup against prior applications)
 
 ---
@@ -268,6 +269,7 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
     shortlist.json                -- Matcher output (gitignored)
     comments.json                 -- Dashboard comments (gitignored)
     selected.json                 -- Dashboard selections (gitignored)
+    job_status.json               -- Reviewed/Applied state per job (gitignored)
     whatsapp_message.txt          -- WhatsApp shortlist (gitignored)
     tailored_resumes.json         -- Tracker of all tailored resumes (gitignored)
     scan_status.json              -- Scan progress for dashboard button (gitignored)
@@ -288,7 +290,7 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 
 ## Known Issues / TODO
 
-1. Dashboard review panel button wiring broken -- tailorOrView() built but Tailor button still calls tailorJob() directly (anchor string mismatch). Fix: wire Tailor button to tailorOrView() and test full end-to-end: Tailor -> Review draft -> Add comments -> Apply revisions -> Generate PDF -> Download
+1. ~~Dashboard review panel button wiring broken~~ DONE (Session 6)
 2. Floating bullet dots in AI/Technical Projects section of PDF -- WeasyPrint rendering artifact, different HTML structure from CORE EXPERIENCE bullets
 3. Push all Session 4 changes to GitHub (pending confirmation)
 4. WhatsApp gateway pairing broken -- sends not working yet
@@ -296,6 +298,7 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 6. Company list hardcoded in ats_scout.py -- migrate to companies.json
 7. No deduplication in Scout output (same role can appear 2-4x from ATS)
 8. Add applied_history.json tracker to flag already-applied companies in Scout results
+9. DeepSeek credits depleted -- top up at platform.deepseek.com to restore scoring (all scores defaulting to 3/5)
 
 ---
 
@@ -359,13 +362,13 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 
 ### P1 — Do Next Session
 
-1. **Manual Tailor pipeline** — paste any JD URL or raw text + role + company into dashboard, trigger tailor.py directly bypassing Scout/Matcher. Need: new `/api/tailor_manual` endpoint in dashboard.py, `--jd-text` flag in tailor.py, and a "Manual Tailor" panel in dashboard_ui.html
-2. **Dashboard review panel button** — verify tailorOrView() wiring (line 230/261/273 in dashboard_ui.html). Need to see full tailorOrView() function + tailor endpoint output before fixing. Commands ready: `sed -n '60,90p' scripts/dashboard.py` and `sed -n '255,345p' scripts/dashboard_ui.html`
-3. **Add Company manually** — fully functioning flow: type company name → auto-detect ATS (Ashby/Greenhouse/Lever) → verify slug → append to company list in ats_scout.py. Backend endpoint + dashboard UI button.
+1. **Add company delete button to Companies tab** — frontend ✕ button exists in dashboard_ui.html calling /api/companies/delete, backend now working. Wire up and test end-to-end.
+2. **DeepSeek credits** — top up at platform.deepseek.com to restore match scoring (currently all jobs defaulting to 3/5 with 402 error)
 
 ### P2 — Next Few Sessions
 
-4. **Git push** — 1 commit ahead of origin/main + unstaged changes in dashboard.py and dashboard_ui.html + resumes/tailored/ untracked. Run: `cd /root/pp-jobapp && git add scripts/dashboard.py scripts/dashboard_ui.html resumes/tailored/ && git commit -m "Session 4-5 updates" && git push`
+3. **TAILOR_FEEDBACK.md aggregator** — accumulate revision lessons to feed back into tailor.py prompt as standing instructions
+4. **Push Session 6 changes to GitHub**
 5. **Broken ATS slugs** — fix Cyera, Wiz, Figma, WandB (wrong platform or slug moved)
 6. **PDF floating bullet dots** — WeasyPrint rendering artifact in AI/Technical Projects section
 7. **Scout deduplication** — same role appearing 2-4x in raw_jobs.json output
@@ -378,6 +381,16 @@ fonts-crosextra-carlito (apt-get) -- Calibri clone
 11. **Improvement loops for Tailor/Matcher/Scout** — feed non-standard applications (e.g. United Airlines, non-SaaS roles) as signal to improve scoring rubric and resume anchors over time
 12. **Add Wellfound / BuiltIn / YC as Scout sources**
 13. **Cleanup OpenClaw-dropped files** — AGENTS.md, IDENTITY.md, SOUL.md, TOOLS.md, USER.md, HEARTBEAT.md should be gitignored or deleted
+
+### Session 6 (April 24 2026)
+- Added POST /api/companies/delete endpoint: removes company from ats_scout.py COMPANIES list (case-insensitive eval-based parsing), cleans matching jobs and company_stats from shortlist.json and raw_jobs.json
+- Added POST /api/job_status and GET /api/job_status_all endpoints: persist reviewed/applied state per job to workspace/job_status.json
+- Dashboard: added Mark Reviewed and Mark Applied buttons per job card, state persists across page refreshes
+- Dashboard: added Reviewed and Applied dropdown filter selects (All / Yes / No) to filter bar
+- Dashboard: removed quick tags (Apply now, Maybe later, SQL blocker, Too senior, Wrong vertical, Location issue) to reduce clutter — can be re-added later
+- Dashboard: fixed download_pdf to always regenerate PDF from latest .txt before serving (fixes stale PDF bug where post-revision downloads returned pre-revision version)
+- PDF filename format changed to: PPaul_<YYYYMMDD>_<company>_<role_condensed_3_words>.pdf
+- DeepSeek API returning 402 Payment Required — all match scores defaulting to 3/5, reason field showing error. Action needed: top up DeepSeek credits at platform.deepseek.com
 
 ### Session 5 Context (April 13 2026)
 
