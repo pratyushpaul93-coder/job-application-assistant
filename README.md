@@ -8,9 +8,7 @@
 
 ## Overall Objective
 
-Automate the end-to-end job search pipeline for Pratyush Paul.
-- Phase 1 (in progress): Scout jobs via ATS APIs, score with DeepSeek, review in dashboard, tailor resumes to PDF
-- Phase 2 (next): WhatsApp delivery, auto-apply, LinkedIn outreach automation
+Automate the portions of the job search pipeline for Pratyush Paul. Scout jobs via ATS APIs, score with DeepSeek, review in dashboard, tailor resumes to PDF
 
 ## Target Roles
 
