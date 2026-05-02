@@ -40,7 +40,7 @@ def fetch_jd(url):
 
 def call_claude(prompt, api_key):
     payload = json.dumps({
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-sonnet-4-6",
         "max_tokens": 2000,
         "messages": [{"role": "user", "content": prompt}]
     }).encode()
