@@ -1,0 +1,44 @@
+PRATYUSH PAUL
+(312) 678-3629 | pratyushpaul93@gmail.com | LinkedIn
+
+SUMMARY
+Strategy and operations leader with 6+ years driving strategic decision-making, cross-functional collaboration, and business growth across North American, Southeast Asian and Middle Eastern markets. Expert in financial modeling, market analysis, and corporate development activities, with proven track record translating complex data into executive-level insights. Experience spans top-tier management consulting (Strategy&) and high-growth technology companies, specializing in pricing optimization, competitive analysis, and strategic partnerships.
+
+CORE EXPERIENCE
+
+Armor Defense, USA (Remote, Chicago)
+Senior Technical Product Manager | May 2025 - Present
+- Led migration of cybersecurity technology platform used by 400+ clients, reached 80% adoption within 3 months while retaining 98% of clients through strategic change management and stakeholder alignment
+- Managed end-to-end initiative to launch container runtime security product, conducting market analysis and building financial models to unlock customer segment projected to generate $2M revenue within first year
+- Analyzed customer tickets and operational data to identify inefficiencies, implemented system improvements that reduced engineering overhead by 50% while enabling focus on strategic product development
+
+Strategy&, Dubai
+Senior Associate | Oct 2022 - Jan 2024
+- Led strategic planning for merger of 2 IoT leaders in KSA, designed operating model harmonizing operations and systems, leading to 95% employee retention and seamless organizational integration
+- Conducted comprehensive market research and financial modeling for Telco client acquisition analysis, recommending targets valued at $10M+ that expanded product portfolio by 30% and entered 2 new market segments
+- Built strategic 5-year revenue projections and financial forecasts for Kuwaiti Telco subsidiary through competitive analysis and market opportunity assessment, providing crucial insights for expansion decisions
+- Deployed governance and reporting systems covering sales performance, technology deployment, and strategic initiative management, enhancing transparency and accelerating cross-functional collaboration
+
+Urban Company, Singapore
+Strategy and Operations Manager | Jan 2022 - Aug 2022
+- Built and led 2-person team driving operational improvements for largest service category, achieved 25% increase in monthly orders, 15-point NPS rise to 45, and 10% boost in provider ratings through data-driven optimization
+- Led strategic initiative to re-launch service category, designed operational frameworks for pricing optimization and market positioning to achieve target unit economics and sustainable growth
+- Implemented targeted retention initiatives based on customer satisfaction analysis, increased provider earnings 15% and improved customer retention rates 25% through lifecycle improvements
+- Optimized agency partnerships through performance analysis and contract renegotiation, resulting in 10% cost reduction and 15% improvement in service quality metrics
+
+Accenture, Singapore
+Management Consultant | Mar 2018 - Dec 2021
+- Designed and implemented B2B marketplace launch strategy including competitive analysis, market segmentation, and pricing models, generating over $1.2M in sales across Southeast Asian markets within first 3 months of operations
+- Created demand forecasting model for global shipping giant to optimize container allocation across 300+ ports worldwide, improving forecasting efficiency by 1% and generating ~$4M in annual savings
+- Directed team of 4 analysts conducting comprehensive market analysis and advertising optimization, delivered strategic recommendations that drove 20% ROI increase for big tech APAC headquarters
+- Managed $5M strategic initiative for gaming client, led cross-functional collaboration aligning business requirements with technical solutions to drive innovation and operational excellence
+
+AI/TECHNICAL PROJECTS
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
+- OpenClaw Job Hunting Pipeline: Job search automation scanning 100+ companies via ATS APIs, DeepSeek scoring, Flask dashboard
+
+EDUCATION AND OTHER EXPERIENCES
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014

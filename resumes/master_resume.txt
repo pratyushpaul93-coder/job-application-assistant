@@ -1,5 +1,5 @@
 PRATYUSH PAUL
-(312) 678-3629 | pratyushpaul93@gmail.com | LinkedIn
+(312) 678-3629 | pratyushpaul93@gmail.com | linkedin.com/in/pratyushpaul | github.com/pratyushpaul93-coder
 
 SUMMARY
 Strategy and operations leader with 6+ years of experience driving business growth and operational excellence across North American, Southeast Asian and Middle Eastern markets. Expert in leading cross-functional teams, managing complex programs, and delivering measurable results through data-driven insights and strategic execution. Proven track record at top-tier management consulting firm (Strategy&) and high-growth technology companies, with expertise spanning strategic planning, operational initiatives, and organizational transformation.
@@ -41,4 +41,4 @@ Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 201
 AI/TECHNICAL PROJECTS (built during job search)
 - SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
 - Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
-- OpenClaw Job Hunting Pipeline: Job search automation scanning 100+ companies via ATS APIs, DeepSeek scoring, Flask dashboard
+- OpenClaw Job Hunting Pipeline: Intelligent scraping (SEC form D, VC portfolios) 100's of target companies and automation scanning via ATS APIs, DeepSeek scoring, Flask dashboard

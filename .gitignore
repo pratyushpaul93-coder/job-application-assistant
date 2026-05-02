@@ -1,8 +1,28 @@
-*.json
-cron.log
-.env
-career-ops/
+# Python
 __pycache__/
 *.pyc
-workspace/
+venv/
+.venv/
+
+# Environment / secrets
+.env
+.env.*
+
+# Logs
+*.log
+cron.log
+dashboard.log
+
+# Backups
+*.bak
+*.backup_*
+*.v1_final_backup_*
+
+# Generated data
+*.json
+*.csv
+*.tar.gz
+
+# Project-specific
+career-ops/
 workspace/

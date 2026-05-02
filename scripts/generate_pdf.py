@@ -33,7 +33,11 @@ def to_html(text):
     # Contact line
     if i < len(lines) and ("@" in lines[i] or "(" in lines[i]):
         c = lines[i].strip()
-        c = re.sub(r"\bLinkedIn\b", f'<a href="{LINKEDIN}">LinkedIn</a>', c)
+        c = re.sub(r"(?:https?://)?(?:www\.)?linkedin\.com/in/[\w\-]+/?",
+                   f'<a href="{LINKEDIN}">LinkedIn</a>', c, flags=re.I)
+        c = re.sub(r"(?:https?://)?(?:www\.)?github\.com/[\w\-]+/?",
+                   f'<a href="{GITHUB}">GitHub</a>', c, flags=re.I)
+        c = re.sub(r"\bLinkedIn\b(?![^<]*</a>)", f'<a href="{LINKEDIN}">LinkedIn</a>', c)
         if "GitHub" not in c:
             c += f' | <a href="{GITHUB}">GitHub</a>'
         html.append(f'<p class="contact">{c}</p>')
@@ -167,7 +171,7 @@ def generate(txt_path, pdf_path):
         {"line_height": "1.12", "font_size": "9.5"},
     ]
 
-    for attempt in attempts:
+    for i, attempt in enumerate(attempts):
         full, pages, tmp = make_pdf(attempt, text, pdf_path)
         print(f"  Attempt line-height={attempt['line_height']} font={attempt['font_size']}pt -> {pages} page(s)")
         if pages == 1:
@@ -177,11 +181,13 @@ def generate(txt_path, pdf_path):
             kb = os.path.getsize(pdf_path) // 1024
             print(f"PDF: {pdf_path} ({kb}KB) - fits 1 page")
             return
-        else:
+        elif i < len(attempts) - 1:
             os.remove(tmp)
 
-    # Last resort: move final attempt anyway and warn
+    # Last resort: keep final attempt even though it's >1 page
     shutil.move(tmp, pdf_path)
+    html_path = pdf_path.replace(".pdf", ".html")
+    open(html_path, "w").write(full)
     print(f"WARNING: Could not fit to 1 page after all attempts. Content needs trimming.")
 
 if __name__ == "__main__":

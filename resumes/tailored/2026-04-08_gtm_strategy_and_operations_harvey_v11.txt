@@ -1,0 +1,44 @@
+PRATYUSH PAUL
+(312) 678-3629 | pratyushpaul93@gmail.com | LinkedIn
+
+SUMMARY
+Strategy and operations leader with 6+ years driving GTM strategy, revenue operations, and cross-functional initiatives across high-growth technology companies and top-tier management consulting. Expert in partnering with business leaders to define strategic initiatives, implementing operational processes that enable scalable growth, and translating complex data into executive-level insights. Proven track record of removing operational bottlenecks and optimizing resource allocation across the customer journey.
+
+CORE EXPERIENCE
+
+Armor Defense, USA (Remote, Chicago)
+Senior Technical Product Manager | May 2025 - Present
+- Led migration of cybersecurity technology platform used by 400+ clients, reached 80% adoption within 3 months while retaining 98% of clients through systematic change management and stakeholder engagement
+- Managed end-to-end initiative to launch container runtime security product, analyzing market opportunity and business metrics to unlock customer segment projected to generate $2M revenue within first year
+- Identified operational bottlenecks through systematic analysis of customer tickets, implemented system improvements that reduced engineering overhead by 50% and enabled team focus on strategic initiatives
+
+Strategy&, Dubai
+Senior Associate | Oct 2022 - Jan 2024
+- Partnered with C-suite leaders on strategic planning for merger of 2 IoT leaders in KSA, designed operating model harmonizing operations and systems, leading to 95% employee retention and operational cohesiveness
+- Led acquisition target analysis for Telco client, conducting market research and financial modeling to recommend targets valued at $10M+ that expanded product portfolio by 30% and entered 2 new segments
+- Synthesized complex market data to generate strategic 5-year revenue projections and financial forecasts for Kuwaiti Telco subsidiary, providing crucial insights for resource allocation and investment decisions
+- Developed and deployed comprehensive governance systems covering sales performance, pipeline tracking, and strategic initiative management, enhancing transparency and accelerating execution
+
+Urban Company, Singapore
+Strategy and Operations Manager | Jan 2022 - Aug 2022
+- Built and led 2-person team driving operational improvements for largest service category, achieved 25% increase in monthly orders, 15-point NPS rise to 45, and 10% boost in average provider ratings to 4.2/5
+- Led strategic initiative to re-launch service category, designed operational frameworks for pricing, quality management and customer acquisition to optimize unit economics and scalable growth
+- Analyzed customer and provider satisfaction data to identify improvement opportunities, implemented targeted interventions that increased provider earnings 15% and improved customer retention 25%
+- Optimized agency partnerships through systematic process improvements, resulting in 10% cost reduction and 15% improvement in service quality metrics
+
+Accenture, Singapore
+Management Consultant | Mar 2018 - Dec 2021
+- Designed and implemented B2B marketplace launch strategy including competitor analysis, target segmentation, and operational frameworks, generating over $1.2M in sales across Southeast Asian markets within first 3 months
+- Created demand forecasting model for global shipping giant to optimize container allocation across 300+ ports worldwide, improving forecasting efficiency by 1% and generating ~$4M in annual savings
+- Directed team of 4 analysts conducting comprehensive market research and advertising optimization, delivered recommendations that drove 20% ROI increase for big tech APAC headquarters
+- Managed $5M strategic transformation initiative for gaming client, led cross-functional collaboration aligning business requirements with technical solutions to drive operational excellence
+
+EDUCATION
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
+
+AI/TECHNICAL PROJECTS
+- SEC EDGAR RAG System: Python RAG pipeline using sentence-transformers and Claude Haiku for SEC filing analysis
+- Spotify MCP Server: Genre classifier with 5-tier fallback system, automatic playlist creation
+- OpenClaw Job Pipeline: Automated job search pipeline scanning 100+ companies via ATS APIs, Flask dashboard

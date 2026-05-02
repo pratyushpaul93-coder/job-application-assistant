@@ -80,8 +80,9 @@ def run(job_url, role_title, company_name):
         "Rules:\n"
         "- Keep all real metrics exactly as stated -- AND keep the context around them (the how and the so what)\n"
         "- Keep 3-4 bullets per role minimum. Never drop below 3\n"
-        "- Each bullet should be 1.5-2 full lines long when rendered -- write FULL, DETAILED bullets not short ones\n"
+        "- Each bullet should be 1.5-2 full lines long when rendered. HARD CAP: 2 lines per bullet, never more. Write FULL, DETAILED bullets but stop at the 2-line ceiling\n"
         "- Bullet structure: [Action verb] + [what you did in detail] + [how/method] + [measurable result]. Include all 4 parts\n"
+        "- Within a single role, no two bullets may start with the same action verb. Vary openers (Led/Drove/Built/Designed/Owned/Launched/Negotiated/Restructured/Scaled/Partnered/Delivered/Recommended, etc.)\n"
         "- Do NOT write short punchy bullets. Write complete sentences with full context, exactly like these examples:\n"
         "  GOOD: Led migration of cybersecurity technology platform used by 400+ clients, providing secure monitored cloud infra with inheritable compliance, reaching 80% adoption within 3 months while retaining 98% of clients\n"
         "  BAD: Led platform migration for 400+ clients, achieving 80% adoption\n"
@@ -105,7 +106,8 @@ def run(job_url, role_title, company_name):
         "- Section order must always be: 1) SUMMARY 2) CORE EXPERIENCE (chronological, most recent first) 3) AI/TECHNICAL PROJECTS 4) EDUCATION AND OTHER EXPERIENCES\n"
         "- NEVER reorder the companies within CORE EXPERIENCE. Always: Armor Defense first, then Strategy&, then Urban Company, then Accenture\n"
         "- Plain text format, same structure as master resume\n"
-        "- ONE PAGE worth of content maximum"
+        "- Contact line (line 2) MUST include phone, email, LinkedIn URL, and GitHub URL exactly as in master resume. NEVER drop the GitHub link.\n"
+        "- ONE PAGE total — STRICT. If content overflows, tighten bullets (cut adjectives/filler) before adding anything. Never exceed one page."
     )
 
     print("Calling Claude Sonnet...")
@@ -133,6 +135,20 @@ def run(job_url, role_title, company_name):
         "tailored_date": date_str
     })
     json.dump(tracker, open(tracker_path, "w"), indent=2)
+
+    # Verify contact line has both LinkedIn and GitHub - inject if missing
+    contact_line = "(312) 678-3629 | pratyushpaul93@gmail.com | linkedin.com/in/pratyushpaul | github.com/pratyushpaul93-coder"
+    has_li = "linkedin.com/in/pratyushpaul" in tailored.lower()
+    has_gh = "github.com/pratyushpaul93-coder" in tailored.lower()
+    if not (has_li and has_gh):
+        lines = tailored.split("\n")
+        for i, line in enumerate(lines):
+            if "pratyushpaul93@gmail.com" in line or "678-3629" in line:
+                lines[i] = contact_line
+                break
+        tailored = "\n".join(lines)
+        open(filepath, "w").write(tailored)
+        print(f"Contact line repaired (had_linkedin={has_li}, had_github={has_gh})")
 
     # Verify Alice internship is present - inject if missing
     alice_line = "Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017"

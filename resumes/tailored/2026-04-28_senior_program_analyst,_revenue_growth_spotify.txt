@@ -1,0 +1,43 @@
+PRATYUSH PAUL
+(312) 678-3629 | pratyushpaul93@gmail.com | LinkedIn
+
+SUMMARY
+Technical product manager and strategy professional with 6+ years of experience driving growth through data-driven solutions and cross-functional execution. Proven track record in product development, strategic analysis, and operational optimization across cybersecurity, consulting, and technology sectors. Expert in leveraging SQL analysis, financial modeling, and A/B testing to deliver measurable business impact and revenue growth.
+
+CORE EXPERIENCE
+
+Armor Defense, USA (Remote, Chicago)
+Senior Technical Product Manager | May 2025 - Present
+- Led migration of cybersecurity technology platform used by 400+ clients, designing lifecycle communications and seller-facing actions that reached 80% adoption within 3 months while achieving 98% client retention
+- Managed end-to-end initiative to launch container runtime security product, analyzing advertiser signals and campaign performance to unlock customer segment projected to generate $2M revenue within first year
+- Analyzed customer tickets to identify operational inefficiencies in seller workflows, implemented system improvements that reduced engineering overhead by 50%
+
+Strategy&, Dubai
+Senior Associate | Oct 2022 - Jan 2024
+- Led acquisition target analysis for Telco client, conducting advanced SQL analysis and financial modeling to recommend $10M+ targets expanding portfolio by 30%
+- Generated strategic 5-year revenue projections and financial forecasts for Kuwaiti Telco subsidiary through structured analysis of market data and performance signals
+- Deployed governance and reporting systems covering sales performance, campaign optimization, and strategic initiatives to improve seller adoption and execution
+- Led strategic planning for merger of 2 IoT leaders in KSA, designed operating model leading to 95% employee retention
+
+Urban Company, Singapore
+Strategy and Operations Manager | Jan 2022 - Aug 2022
+- Built and led 2-person team, designed lifecycle programs driving 25% increase in monthly orders, 15-point NPS rise to 45, and 10% boost in provider ratings
+- Led strategic initiative to re-launch service category in Jakarta, including market analysis, pricing strategy, and operational improvements
+- Implemented targeted lifecycle interventions based on satisfaction signals that increased provider earnings 15% and customer retention 25%
+- Optimized agency partnerships through performance analysis, achieving 10% cost reduction and 15% improvement in service quality
+
+Accenture, Singapore
+Management Consultant | Mar 2018 - Dec 2021
+- Designed go-to-market strategy for B2B marketplace launch in Southeast Asia, including vendor onboarding and demand generation programs
+- Built demand forecasting model using machine learning for global shipping client, improving accuracy by 15% across 300+ ports
+- Led team of 4 analysts in optimization project for Fortune 500 technology company, delivering process improvements and cost savings
+
+EDUCATION AND OTHER EXPERIENCES
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
+
+AI/TECHNICAL PROJECTS
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation
+- OpenClaw Job Hunting Pipeline: Job search automation scanning 100+ companies via ATS APIs, DeepSeek scoring, Flask dashboard

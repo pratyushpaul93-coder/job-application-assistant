@@ -1,0 +1,44 @@
+PRATYUSH PAUL
+(312) 678-3629 | pratyushpaul93@gmail.com | linkedin.com/in/pratyushpaul | github.com/pratyushpaul93-coder
+
+SUMMARY
+Forward-deployed strategy and operations leader with 6+ years driving commercial growth, client discovery, and cross-functional delivery across North American, Southeast Asian and Middle Eastern markets. Expert in translating complex client problems into production-ready solutions while coordinating across sales, product, and engineering teams. Proven track record at top-tier management consulting firm and high-growth technology companies, with expertise in structured problem-solving and enterprise relationship management.
+
+CORE EXPERIENCE
+
+Armor Defense, USA (Remote, Chicago)
+Senior Technical Product Manager | May 2025 - Present
+- Led migration of cybersecurity technology platform used by 400+ clients providing secure monitored cloud infrastructure with inheritable compliance, reaching 80% adoption within 3 months while retaining 98% of clients
+- Owned end-to-end initiative to launch container runtime security product, conducting deep discovery sessions and market analysis to unlock customer segment projected to generate $2M revenue within first year
+- Built operational improvements by analyzing customer tickets to identify inefficiencies, implementing system enhancements that reduced engineering overhead by 50%
+
+Strategy&, Dubai
+Senior Associate | Oct 2022 - Jan 2024
+- Partnered directly with C-suite executives on merger of 2 IoT leaders in KSA, designing operating model harmonizing operations and systems, leading to 95% employee retention
+- Delivered acquisition target analysis for Telco client through structured market research and financial modeling, recommending $10M+ targets that expanded product portfolio by 30%
+- Coordinated strategic 5-year revenue projections and financial forecasts for Kuwaiti Telco subsidiary, translating complex market data into executive-level insights for investment decisions
+- Deployed comprehensive governance and reporting systems covering sales performance, technology deployment, and strategic initiatives, enhancing transparency and accelerating implementation
+
+Urban Company, Singapore
+Strategy and Operations Manager | Jan 2022 - Aug 2022
+- Built and led 2-person team at services platform, drove operational improvements for largest category including 25% increase in monthly orders, 15-point NPS rise to 45, and 10% boost in cleaner ratings
+- Launched strategic initiative to re-launch service category, designing operational frameworks for pricing, quality and hyperlocal acquisition to achieve target unit economics
+- Delivered targeted retention improvements through data-driven analysis of satisfaction signals, implementing lifecycle interventions that increased provider earnings 15% and customer retention 25%
+- Optimized agency partnerships through structured vendor management, achieving 10% cost reduction and 15% improvement in service quality
+
+Accenture, Singapore
+Management Consultant | Mar 2018 - Dec 2021
+- Designed and implemented B2B marketplace launch strategy across competitor analysis, target segmentation, assortment and operations, generating $1.2M in sales across Southeast Asian markets within first 3 months
+- Built demand forecasting model for global shipping giant to optimize container allocation across 300+ ports worldwide, improving forecasting efficiency by 1% and generating $4M in annual savings
+- Directed team of 4 analysts conducting comprehensive market research and advertising optimization, delivered structured recommendations driving 20% ROI increase for big tech APAC HQ
+- Coordinated $5M strategic technology initiative for gaming client, leading cross-functional collaboration between business requirements and technical solutions
+
+AI/TECHNICAL PROJECTS
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
+- OpenClaw Job Hunting Pipeline: Intelligent scraping and automation scanning via ATS APIs, DeepSeek scoring, Flask dashboard
+
+EDUCATION AND OTHER EXPERIENCES
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014

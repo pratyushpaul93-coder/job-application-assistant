@@ -1,0 +1,42 @@
+PRATYUSH PAUL
+(312) 678-3629 | pratyushpaul93@gmail.com | LinkedIn
+
+SUMMARY
+Strategic operations leader with 6+ years of experience building and scaling marketplace programs, managing cross-functional partnerships, and driving commercial outcomes across technology companies and top-tier consulting. Expert in partner management, program operations, and translating on-the-ground insights into product requirements. Proven track record managing complex deal lifecycles, onboarding processes, and operational workflows while working across organizational boundaries to deliver scalable marketplace solutions.
+
+CORE EXPERIENCE
+
+Armor Defense, USA (Remote, Chicago)
+Senior Technical Product Manager | May 2025 - Present
+- Led cross-functional migration of cybersecurity technology platform used by 400+ clients, coordinating across product and engineering teams to reach 80% adoption within 3 months while retaining 98% of clients
+- Managed end-to-end initiative to launch container runtime security product, analyzing market opportunity and business metrics to unlock customer segment projected to generate $2M revenue within first year
+- Analyzed customer tickets to identify operational inefficiencies, designed and implemented system improvements that reduced engineering overhead by 50%, enabling team to focus on strategic product development
+
+Strategy&, Dubai
+Senior Associate | Oct 2022 - Jan 2024
+- Led strategic planning for merger of 2 IoT leaders in KSA, designed operating model harmonizing operations and systems across organizational boundaries, leading to 95% employee retention
+- Led acquisition target analysis for Telco client, conducting market research and financial modeling to recommend $10M+ targets expanding product portfolio by 30% and entering 2 new market segments
+- Developed and deployed comprehensive governance and reporting systems covering sales performance, technology deployment, and strategic initiative management, enhancing transparency and accelerating implementation
+
+Urban Company, Singapore
+Strategy and Operations Manager | Jan 2022 - Aug 2022
+- Built and led 2-person team driving operational improvements for largest category, managing partner relationships and customer onboarding processes to achieve 25% increase in monthly orders and 15-point NPS rise to 45
+- Led strategic initiative to re-launch service category, designed operational frameworks for pricing, quality management, and partner acquisition to achieve desired unit economics across two-sided marketplace
+- Implemented targeted initiatives through data-driven analysis increasing partner earnings 15% and customer retention 25%, balancing marketplace participant success
+- Optimized agency partnerships through process improvements and relationship management, resulting in 10% cost reduction and 15% improvement in service quality
+
+Accenture, Singapore
+Management Consultant | Mar 2018 - Dec 2021
+- Designed and implemented B2B marketplace launch strategy including partner segmentation, onboarding processes, and operational workflows, generating over $1.2M in sales across Southeast Asian markets within first 3 months
+- Directed team of 4 analysts delivering recommendations through cross-functional coordination with business and technical stakeholders, driving 20% ROI increase for big tech APAC HQ
+- Managed $5M strategic initiative for gaming client, leading cross-functional collaboration to align business requirements with technical solutions and drive operational excellence
+
+EDUCATION AND OTHER EXPERIENCES
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
+
+AI/TECHNICAL PROJECTS
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
+- OpenClaw Job Hunting Pipeline: Job search automation scanning 100+ companies via ATS APIs, DeepSeek scoring, Flask dashboard

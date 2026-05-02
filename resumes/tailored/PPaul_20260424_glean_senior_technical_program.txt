@@ -1,0 +1,43 @@
+PRATYUSH PAUL
+(312) 678-3629 | pratyushpaul93@gmail.com | LinkedIn
+
+SUMMARY
+Technical program management leader with 6+ years of experience driving cross-functional execution, managing strategic escalations, and delivering measurable results through operational excellence across enterprise technology environments. Expert in coordinating complex technical initiatives involving Engineering, Product, Support, and Customer Success teams. Proven track record managing high-priority customer issues, building escalation processes, and turning critical incidents into opportunities for systemic improvement at high-growth technology companies and top-tier management consulting firms.
+
+CORE EXPERIENCE
+
+Armor Defense, USA (Remote, Chicago)
+Senior Technical Product Manager | May 2025 - Present
+- Led end-to-end migration of cybersecurity technology platform used by 400+ clients, coordinating across Engineering, Product, and Customer Success teams to reach 80% adoption within 3 months while retaining 98% of clients through structured communication and risk mitigation
+- Managed cross-functional initiative to launch container runtime security product, partnering with technical teams to assess tradeoffs and drive execution through ambiguity, unlocking customer segment projected to generate $2M revenue within first year
+- Analyzed customer tickets to identify systemic operational inefficiencies, drove corrective actions and implemented system improvements that reduced engineering overhead by 50%
+
+Strategy&, Dubai
+Senior Associate | Oct 2022 - Jan 2024
+- Led strategic planning for merger of 2 IoT leaders in KSA, designed operating model harmonizing operations and systems across Engineering, Product, and go-to-market functions, achieving 95% employee retention through clear communication and stakeholder alignment
+- Led acquisition target analysis for Telco client, conducting market research and financial modeling to recommend targets valued at $10M+ that expanded product portfolio by 30% and entered 2 new market segments
+- Developed and deployed comprehensive governance and reporting systems covering technical issue resolution workflows, escalation management, and strategic initiative tracking, enhancing transparency and accelerating implementation
+
+Urban Company, Singapore
+Strategy and Operations Manager | Jan 2022 - Aug 2022
+- Built and led 2-person team driving operational improvements for largest category, achieved 25% increase in monthly orders, 15-point NPS rise to 45, and 10% boost in cleaner ratings through systematic analysis and cross-functional execution
+- Led strategic initiative to re-launch service category, designed operational frameworks for pricing, quality and hyperlocal acquisition, coordinating across Product, Engineering, and operations teams to achieve desired unit economics
+- Identified recurring themes through customer and provider satisfaction data analysis, implemented targeted corrective actions that increased provider earnings 15% and improved customer retention 25%
+- Optimized agency partnerships through structured problem-solving and stakeholder management, resulting in 10% cost reduction and 15% improvement in service quality
+
+Accenture, Singapore
+Management Consultant | Mar 2018 - Dec 2021
+- Designed and implemented B2B marketplace launch strategy involving competitor analysis, target segmentation, and operational workflows, generating over $1.2M in sales across Southeast Asian markets within first 3 months through rigorous program management
+- Created demand forecasting model for global shipping giant to optimize container allocation across 300+ ports worldwide, improving forecasting efficiency by 1% and generating ~$4M in annual savings
+- Directed team of 4 analysts delivering comprehensive analysis and executive-ready recommendations that drove 20% ROI increase for big tech APAC HQ through clear communication and stakeholder alignment
+- Managed $5M strategic initiative for gaming client, led cross-functional collaboration aligning business requirements with technical solutions under pressure
+
+EDUCATION AND OTHER EXPERIENCES
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
+
+AI/TECHNICAL PROJECTS
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
+- OpenClaw Job Hunting Pipeline: Job search automation scanning 100+ companies via ATS APIs, DeepSeek scoring, Flask dashboard

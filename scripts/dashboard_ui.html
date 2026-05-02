@@ -7,14 +7,36 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f5;color:#111;font-size:14px}
 .hdr{background:#fff;padding:14px 20px;border-bottom:1px solid #e5e5e5;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.hdr-left{display:flex;align-items:center;gap:16px}
+.hdr-title{font-size:16px;font-weight:600}
+.hdr-meta{font-size:12px;color:#888;margin-top:2px}
+
+/* ── Main tabs ── */
+.main-tabs{display:flex;gap:0;background:#fff;border-bottom:2px solid #e5e5e5;padding:0 20px}
+.main-tab{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color 0.15s}
+.main-tab.active{color:#111;border-bottom-color:#111;font-weight:600}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* ── Stats bar ── */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid #e5e5e5}
 .stat{background:#f9f9f9;border-radius:8px;padding:10px 12px}
 .stat-l{font-size:11px;color:#888;margin-bottom:3px}
 .stat-n{font-size:20px;font-weight:600}
+
+/* ── Filter pills ── */
 .filters{padding:10px 16px;background:#fff;border-bottom:1px solid #e5e5e5;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .pill{font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555}
 .pill.on{background:#111;color:#fff;border-color:#111}
 .srch{margin-left:auto;font-size:12px;padding:5px 10px;border:1px solid #ddd;border-radius:20px;width:140px}
+
+/* ── Sort toggle ── */
+.sort-bar{padding:8px 16px;background:#fff;border-bottom:1px solid #e5e5e5;display:flex;align-items:center;gap:8px}
+.sort-label{font-size:12px;color:#888}
+.sort-btn{font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555}
+.sort-btn.on{background:#111;color:#fff;border-color:#111}
+
+/* ── Job cards ── */
 .jobs{padding:10px 16px 70px;max-width:900px;margin:0 auto}
 .card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:14px 16px;margin-bottom:10px}
 .card.sel{border:2px solid #1a7a55}
@@ -39,6 +61,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f5f5;
 .blu{background:#2563eb;color:#fff;border-color:#2563eb}
 .reason{font-size:12px;color:#666;margin:8px 0 0 30px;line-height:1.5}
 .cmt{margin:8px 0 0 30px}
+.badge.mine{background:#fde68a;color:#78350f;border:1px solid #fbbf24}
+.badge.vc{background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;font-weight:500;margin-left:0}
+.fit-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed #eee}
+.fit-label{font-size:11px;color:#888;font-weight:600;letter-spacing:0.02em}
+.fbtn{font-size:12px;padding:3px 9px;border:1px solid #ddd;border-radius:14px;cursor:pointer;background:#fff;color:#555;font-weight:600;min-width:28px;line-height:1.4}
+.fbtn:hover{border-color:#1a7a55}
+.fbtn.on{background:#1a7a55;color:#fff;border-color:#1a7a55}
+.fit-cmt{flex:1 1 200px;min-width:160px}
+.fit-cmt textarea{font-size:12px;padding:5px 9px;min-height:36px}
+.fit-status{font-size:11px;color:#1a7a55;font-weight:600;min-height:14px}
+.fit-status.warn{color:#b45309}
 textarea{width:100%;font-size:12px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;background:#fafafa;color:#111;resize:vertical;font-family:inherit}
 textarea:focus{outline:none;border-color:#1a7a55}
 .tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;align-items:center}
@@ -51,176 +84,676 @@ textarea:focus{outline:none;border-color:#1a7a55}
 .toast{position:fixed;top:60px;right:16px;background:#111;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;z-index:100;display:none}
 .tailor-status{font-size:11px;color:#2563eb;margin-left:6px;display:none}
 @media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}.acts{display:none}}
-
 .review-panel{display:none;margin:10px 0 0 30px;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden}
-.review-panel.open{display:block}
 .review-tabs{display:flex;border-bottom:1px solid #e5e5e5;background:#f9f9f9}
 .review-tab{padding:8px 14px;font-size:12px;cursor:pointer;color:#666;border-bottom:2px solid transparent}
 .review-tab.active{color:#111;border-bottom-color:#111;font-weight:600}
 .review-content{padding:12px;background:#fff}
 .draft-text{font-size:11px;font-family:monospace;white-space:pre-wrap;line-height:1.5;color:#333;max-height:400px;overflow-y:auto;background:#f9f9f9;padding:10px;border-radius:6px}
 .review-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center}
-.review-note{font-size:11px;color:#888;margin-top:6px}
+
+/* ── Companies tab ── */
+.companies-wrap{padding:12px 16px 70px;max-width:900px;margin:0 auto}
+.companies-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.companies-toolbar span{font-size:13px;color:#666}
+.co-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e5}
+.co-table th{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;padding:10px 14px;background:#f9f9f9;border-bottom:1px solid #e5e5e5;text-align:left}
+.co-table td{font-size:13px;padding:10px 14px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.co-table tr:last-child td{border-bottom:none}
+.co-table tr:hover td{background:#fafafa}
+.co-ats{font-size:11px;padding:2px 7px;border-radius:10px;font-weight:500}
+.co-ats.ashby{background:#fef3c7;color:#92400e}
+.co-ats.greenhouse{background:#dcfce7;color:#166534}
+.co-ats.lever{background:#dbeafe;color:#1e40af}
+.co-ats.tavily{background:#f3f4f6;color:#555}
+.co-status-ok{color:#166534;font-size:12px}
+.co-status-err{color:#991b1b;font-size:12px}
+.co-status-skip{color:#888;font-size:12px}
+.co-status-none{color:#bbb;font-size:12px}
+.co-matches{font-weight:600;color:#1a7a55}
+.co-zero{color:#bbb}
+.companies-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.companies-filters .srch{margin-left:auto;width:200px}
+.co-table th.co-actions-col{width:32px}
+
+/* ── Modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:24px;width:90%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,0.18)}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:16px}
+.modal input[type=text]{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:12px;font-family:inherit}
+.modal input[type=text]:focus{outline:none;border-color:#1a7a55}
+.modal-row{display:flex;gap:8px;margin-bottom:12px}
+.modal-row select,.modal-row input{flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit}
+.detect-card{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px;margin-bottom:14px;display:none}
+.detect-card.err{background:#fef2f2;border-color:#fca5a5}
+.detect-card .dc-title{font-size:13px;font-weight:600;margin-bottom:6px}
+.detect-card .dc-meta{font-size:12px;color:#555;margin-bottom:8px}
+.detect-card .dc-jobs{font-size:11px;color:#444;line-height:1.8}
+.detect-card .dc-jobs span{display:block}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.modal-spinner{display:none;font-size:12px;color:#888;margin-bottom:10px}
+
+/* ── Manual Tailor tab ── */
+.mt-wrap{padding:20px 16px 70px;max-width:680px;margin:0 auto}
+.mt-card{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:20px 22px;margin-bottom:14px}
+.mt-card h4{font-size:13px;font-weight:600;margin-bottom:14px;color:#111}
+.mt-field{margin-bottom:12px}
+.mt-field label{display:block;font-size:11px;color:#888;margin-bottom:5px;font-weight:500}
+.mt-field input,.mt-field textarea{width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;background:#fff}
+.mt-field input:focus,.mt-field textarea:focus{outline:none;border-color:#1a7a55}
+.mt-field textarea{resize:vertical;min-height:160px}
+.mt-toggle{font-size:12px;color:#2563eb;cursor:pointer;text-decoration:underline;margin-top:4px;display:inline-block}
+.mt-row{display:flex;gap:10px}
+.mt-row .mt-field{flex:1}
+.mt-status{font-size:12px;color:#888;margin-left:10px}
+.mt-result{display:none;background:#fff;border:1px solid #e5e5e5;border-radius:12px;overflow:hidden;margin-bottom:14px}
+.mt-result-header{padding:12px 16px;background:#f0fdf4;border-bottom:1px solid #e5e5e5;font-size:13px;font-weight:600;color:#166534}
+.mt-result-body{padding:14px}
+.mt-comment-label{font-size:11px;color:#888;font-weight:500;margin:12px 0 5px}
+.mt-comment-box{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;min-height:68px;background:#fafafa;color:#111}
+.mt-comment-box:focus{outline:none;border-color:#1a7a55}
+.mt-divider{border:none;border-top:1px solid #e5e5e5;margin:12px 0}
+.mt-draft-text{font-size:11px;font-family:monospace;white-space:pre-wrap;line-height:1.5;color:#333;max-height:480px;overflow-y:auto;background:#f9f9f9;padding:10px;border-radius:6px}
+.mt-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+
+.co-del-btn{background:none;border:none;color:#ccc;font-size:13px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.co-del-btn:hover{color:#e53e3e;background:#fff0f0}
+
+/* ── Job status buttons ── */
+.status-btns{display:flex;gap:6px;margin-top:6px;}
+.sbtn{font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555;transition:all .15s}
+.sbtn.reviewed.on{background:#d1fae5;color:#065f46;border-color:#6ee7b7}
+.sbtn.applied.on{background:#dbeafe;color:#1e40af;border-color:#93c5fd}
+/* ── Filter dropdowns ── */
+.filter-select{font-size:12px;padding:4px 8px;border-radius:20px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#555;outline:none}
+.filter-select:focus{border-color:#111}
+/* ── Multiselect dropdown ── */
+.ms{position:relative;display:inline-block}
+.ms>summary{font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid #ddd;background:#fff;color:#555;cursor:pointer;list-style:none;user-select:none}
+.ms>summary::-webkit-details-marker{display:none}
+.ms>summary::after{content:" ▾";font-size:10px;color:#888}
+.ms[open]>summary{border-color:#111;background:#f5f5f5}
+.ms-panel{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.08);padding:6px 0;min-width:160px;z-index:50;max-height:280px;overflow-y:auto}
+.ms-panel label{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:12px;color:#333;cursor:pointer;white-space:nowrap}
+.ms-panel label:hover{background:#f5f5f5}
+.ms-panel input[type=checkbox]{margin:0;cursor:pointer}
+.ms.active>summary{background:#111;color:#fff;border-color:#111}
 </style>
 </head>
 <body>
+
 <div class="hdr">
-  <div><div style="font-size:16px;font-weight:600">Job pipeline</div><div style="font-size:12px;color:#888;margin-top:2px" id="meta">Loading...</div></div>
+  <div class="hdr-left">
+    <div>
+      <div class="hdr-title">Job pipeline</div>
+      <div class="hdr-meta" id="meta">Loading...</div>
+    </div>
+  </div>
   <div style="display:flex;gap:8px;align-items:center">
     <span id="tailor-status" class="tailor-status"></span>
     <button class="btn" id="scan-btn" onclick="runScan()">Run scan</button>
-    <button class="btn grn" onclick="alert('WhatsApp gateway pairing pending')">WhatsApp</button>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
-<div class="stats">
-  <div class="stat"><div class="stat-l">Total scanned</div><div class="stat-n" id="st0">-</div></div>
-  <div class="stat"><div class="stat-l">Shortlisted</div><div class="stat-n" id="st1">-</div></div>
-  <div class="stat"><div class="stat-l">Selected</div><div class="stat-n" id="st2">0</div></div>
-  <div class="stat"><div class="stat-l">Commented</div><div class="stat-n" id="st3">0</div></div>
+
+<!-- ── Main tab bar ── -->
+<div class="main-tabs">
+  <div class="main-tab active" id="tab-companies" onclick="switchTab('companies')">Companies</div>
+  <div class="main-tab" id="tab-jobs" onclick="switchTab('jobs')">Matching Jobs</div>
+  <div class="main-tab" id="tab-manual" onclick="switchTab('manual')">Manual Tailor</div>
 </div>
-<div class="filters">
-  <span class="pill on" data-f="all" onclick="setF(this)">All</span>
-  <span class="pill" data-f="5" onclick="setF(this)">5/5</span>
-  <span class="pill" data-f="4" onclick="setF(this)">4/5</span>
-  <span class="pill" data-f="3" onclick="setF(this)">3/5</span>
-  <span class="pill" data-f="sel" onclick="setF(this)">Selected</span>
-  <span class="pill" data-f="com" onclick="setF(this)">Commented</span>
-  <span class="pill" data-f="fresh" onclick="setF(this)">Posted &lt;14d</span>
-  <span class="pill" data-f="tailored" onclick="setF(this)">Tailored</span>
-  <input class="srch" placeholder="Search..." oninput="doSearch(this.value)">
+
+<!-- ══════════════ COMPANIES TAB ══════════════ -->
+<div class="tab-pane active" id="pane-companies">
+  <div class="companies-wrap">
+    <div class="companies-toolbar">
+      <span id="co-summary">Loading companies...</span>
+      <button class="btn grn" onclick="openAddCompany()">+ Add Company</button>
+    </div>
+    <div class="companies-filters">
+      <select class="filter-select" id="co-f-ats" onchange="setCoFilter('ats',this.value)">
+        <option value="all">ATS: All</option>
+      </select>
+      <select class="filter-select" id="co-f-stage" onchange="setCoFilter('stage',this.value)">
+        <option value="all">Stage: All</option>
+      </select>
+      <select class="filter-select" id="co-f-vertical" onchange="setCoFilter('vertical',this.value)">
+        <option value="all">Vertical: All</option>
+      </select>
+      <input class="srch" id="co-search" placeholder="Search companies..." oninput="setCoSearch(this.value)">
+    </div>
+    <table class="co-table" id="co-table">
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>ATS</th>
+          <th>Stage</th>
+          <th>Vertical</th>
+          <th>Total Jobs</th>
+          <th>Matches</th>
+          <th>Last Scanned</th>
+          <th>Status</th>
+          <th class="co-actions-col"></th>
+        </tr>
+      </thead>
+      <tbody id="co-body">
+        <tr><td colspan="9" style="text-align:center;color:#888;padding:30px">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
-<div class="jobs" id="list"></div>
-<div class="bar">
+
+<!-- ══════════════ JOBS TAB ══════════════ -->
+<div class="tab-pane" id="pane-jobs">
+  <div class="stats">
+    <div class="stat"><div class="stat-l">Total scanned</div><div class="stat-n" id="st0">-</div></div>
+    <div class="stat"><div class="stat-l">Shortlisted</div><div class="stat-n" id="st1">-</div></div>
+    <div class="stat"><div class="stat-l">Reviewed</div><div class="stat-n" id="st2">0</div></div>
+    <div class="stat"><div class="stat-l">Applied</div><div class="stat-n" id="st3">0</div></div>
+  </div>
+  <div class="filters">
+    <span class="pill on" data-f="all" onclick="setF(this)">All</span>
+    <span class="pill" data-f="fresh" onclick="setF(this)">Posted &lt;14d</span>
+    <span class="pill" data-f="tailored" onclick="setF(this)">Tailored</span>
+    <details class="ms" id="ms-score">
+      <summary id="ms-score-sum">Score: All</summary>
+      <div class="ms-panel" id="ms-score-panel">
+        <label><input type="checkbox" value="5" onchange="onScoreToggle()">5/5</label>
+        <label><input type="checkbox" value="4" onchange="onScoreToggle()">4/5</label>
+        <label><input type="checkbox" value="3" onchange="onScoreToggle()">3/5</label>
+      </div>
+    </details>
+    <details class="ms" id="ms-vc">
+      <summary id="ms-vc-sum">Backed by: All</summary>
+      <div class="ms-panel" id="ms-vc-panel"></div>
+    </details>
+    <select class="filter-select" id="f-reviewed" onchange="render()">
+      <option value="all">Reviewed: All</option>
+      <option value="yes">Reviewed</option>
+      <option value="no">Not Reviewed</option>
+    </select>
+    <select class="filter-select" id="f-applied" onchange="render()">
+      <option value="all">Applied: All</option>
+      <option value="yes">Applied</option>
+      <option value="no">Not Applied</option>
+    </select>
+    <input class="srch" placeholder="Search..." oninput="doSearch(this.value)">
+  </div>
+  <div class="sort-bar">
+    <span class="sort-label">Sort:</span>
+    <button class="sort-btn on" id="sort-score" onclick="setSort('score')">Score</button>
+    <button class="sort-btn" id="sort-date" onclick="setSort('date')">Most Recent</button>
+  </div>
+  <div class="jobs" id="list"></div>
+</div>
+
+<div class="bar" id="bottom-bar" style="display:none">
   <span style="font-size:13px;color:#555"><span id="bsel">0</span> selected</span>
   <div style="display:flex;gap:8px">
     <button class="btn" onclick="tailorSelected()">Tailor selected</button>
     <button class="btn grn" onclick="alert('WhatsApp coming soon')">Send to WhatsApp</button>
   </div>
 </div>
-<script>
-var jobs=[],comments={},selected=new Set(),filter='all',q='',tailoredUrls=new Set(),tailoredFiles={};
-var TAGS=['Apply now','Maybe later','SQL blocker','Too senior','Wrong vertical','Location issue'];
 
+<!-- ══════════════ ADD COMPANY MODAL ══════════════ -->
+<div class="modal-overlay" id="ac-modal">
+  <div class="modal">
+    <h3>Add Company to Scout</h3>
+    <input type="text" id="ac-name" placeholder="Company name (e.g. Cursor, Descript)" autocomplete="off">
+    <div class="modal-spinner" id="ac-spinner">Detecting ATS...</div>
+    <div class="detect-card" id="ac-card">
+      <div class="dc-title" id="ac-card-title"></div>
+      <div class="dc-meta" id="ac-card-meta"></div>
+      <div class="dc-jobs" id="ac-card-jobs"></div>
+      <div id="ac-manual" style="margin-top:10px;display:none">
+        <div class="modal-row">
+          <select id="ac-ats"><option value="ashby">Ashby</option><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option></select>
+          <input type="text" id="ac-slug" placeholder="slug (e.g. getcursor)">
+        </div>
+      </div>
+    </div>
+    <div class="modal-row" id="ac-meta-row" style="display:none">
+      <select id="ac-stage">
+        <option value="Series A">Series A</option><option value="Series B">Series B</option>
+        <option value="Series C">Series C</option><option value="Series D">Series D</option>
+        <option value="Series D+">Series D+</option><option value="Series E">Series E</option>
+        <option value="Series F">Series F</option><option value="Bootstrapped">Bootstrapped</option>
+        <option value="Public">Public</option><option value="Unknown" selected>Stage Unknown</option>
+      </select>
+      <select id="ac-vertical">
+        <option value="AI">AI</option><option value="SaaS" selected>SaaS</option>
+        <option value="Fintech">Fintech</option><option value="Marketplace">Marketplace</option>
+        <option value="Cybersecurity">Cybersecurity</option><option value="Other">Other</option>
+      </select>
+    </div>
+    <div id="ac-result" style="font-size:12px;color:#1a7a55;margin-bottom:8px;display:none"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeAddCompany()">Cancel</button>
+      <button class="btn" id="ac-detect-btn" onclick="detectCompany()">Detect ATS</button>
+      <button class="btn grn" id="ac-confirm-btn" style="display:none" onclick="confirmAddCompany()">Add to Scout</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+var jobs=[],comments={},selected=new Set(),jobStatus={},feedback={},filter='all',q='',sortMode='score';
+var scoreFilter=new Set(),vcFilter=new Set();
+var tailoredUrls=new Set(),tailoredFiles={};
+var shownJobs=[];
+var TAGS=[];
+var currentTab='companies';
+
+// ── Tab switching ──────────────────────────────────────────
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.main-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('pane-'+tab).classList.add('active');
+  updateBottomBar();
+}
+function updateBottomBar(){
+  var show = currentTab==='jobs' && selected.size>0;
+  document.getElementById('bottom-bar').style.display = show ? 'flex' : 'none';
+}
+
+// ── Toast ──────────────────────────────────────────────────
 function showToast(msg,ms){
   var t=document.getElementById('toast');
   t.textContent=msg;t.style.display='block';
   setTimeout(function(){t.style.display='none';},ms||2500);
 }
 
+// ── Date label ─────────────────────────────────────────────
 function dateLabel(daysAgo){
   if(daysAgo===null||daysAgo===undefined)return '';
-  if(daysAgo<=7)return '<span class="date-fresh">'+daysAgo+'d ago</span>';
   if(daysAgo<=14)return '<span class="date-fresh">'+daysAgo+'d ago</span>';
   if(daysAgo<=30)return '<span class="date-old">'+daysAgo+'d ago</span>';
   return '<span class="date-stale">'+daysAgo+'d ago</span>';
 }
 
+// ── Load all data ──────────────────────────────────────────
 async function load(){
   var r=await fetch('/api/data');
   var d=await r.json();
-  jobs=d.jobs||[];comments=d.comments||{};selected=new Set(d.selected||[]);
-  document.getElementById('meta').textContent='Last scan: '+d.scan_date+' | '+d.companies+' companies';
+  jobs=d.jobs||[];comments=d.comments||{};selected=new Set(d.selected||[]);jobStatus=d.job_status||{};feedback=d.feedback||{};
+  document.getElementById('meta').textContent='Last scan: '+d.scan_date;
   document.getElementById('st0').textContent=d.total_scanned||0;
   document.getElementById('st1').textContent=d.total_shortlisted||0;
   var tr=await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
   tailoredUrls=new Set(tr.map(function(t){return t.job_url;}));
   tr.forEach(function(t){tailoredFiles[t.job_url]=t.tailored_file;});
+  populateVcFilter();
+  render();
+  loadCompanies();
+}
+
+// ── Companies tab ──────────────────────────────────────────
+var allCompanies=[],coScanDate=null;
+var coFilter={search:'',ats:'all',stage:'all',vertical:'all'};
+
+async function loadCompanies(){
+  var r=await fetch('/api/companies');
+  var d=await r.json();
+  allCompanies=d.companies||[];
+  coScanDate=d.scan_date||null;
+  populateCompanyFilters();
+  renderCompanies();
+}
+
+function populateCompanyFilters(){
+  var atsSet=new Set(),stageSet=new Set(),vertSet=new Set();
+  allCompanies.forEach(function(c){
+    if(c.ats)atsSet.add(c.ats);
+    if(c.stage)stageSet.add(c.stage);
+    if(c.vertical)vertSet.add(c.vertical);
+  });
+  fillCoSelect('co-f-ats','ATS',atsSet,coFilter.ats);
+  fillCoSelect('co-f-stage','Stage',stageSet,coFilter.stage);
+  fillCoSelect('co-f-vertical','Vertical',vertSet,coFilter.vertical);
+}
+function fillCoSelect(id,label,values,current){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var opts='<option value="all">'+label+': All</option>';
+  Array.from(values).sort().forEach(function(v){
+    opts+='<option value="'+v+'"'+(current===v?' selected':'')+'>'+v+'</option>';
+  });
+  el.innerHTML=opts;
+}
+function coFuzzyMatch(needle,haystack){
+  if(!needle)return true;
+  needle=needle.toLowerCase();haystack=(haystack||'').toLowerCase();
+  if(haystack.indexOf(needle)>=0)return true;
+  var i=0;
+  for(var j=0;j<haystack.length&&i<needle.length;j++){
+    if(haystack.charAt(j)===needle.charAt(i))i++;
+  }
+  return i===needle.length;
+}
+function setCoSearch(v){coFilter.search=v.trim();renderCompanies();}
+function setCoFilter(field,value){coFilter[field]=value;renderCompanies();}
+
+function renderCompanies(){
+  var companies=allCompanies.filter(function(c){
+    if(coFilter.ats!=='all'&&c.ats!==coFilter.ats)return false;
+    if(coFilter.stage!=='all'&&c.stage!==coFilter.stage)return false;
+    if(coFilter.vertical!=='all'&&c.vertical!==coFilter.vertical)return false;
+    if(coFilter.search&&!coFuzzyMatch(coFilter.search,c.name))return false;
+    return true;
+  });
+  var summary=companies.length+(companies.length===allCompanies.length?'':' of '+allCompanies.length)+' companies · last scan: '+(coScanDate||'never');
+  document.getElementById('co-summary').textContent=summary;
+
+  var rows='';
+  for(var i=0;i<companies.length;i++){
+    var c=companies[i];
+    var atsCls='co-ats '+(c.ats||'');
+    var totalH=c.total_jobs===null?'<span class="co-zero">—</span>':c.total_jobs;
+    var matchH=c.matches===null?'<span class="co-zero">—</span>':(c.matches>0?'<span class="co-matches">'+c.matches+'</span>':'<span class="co-zero">0</span>');
+    var scannedH=c.last_scanned||'<span class="co-zero">Never</span>';
+    var statusH='<span class="co-status-none">Not scanned</span>';
+    if(c.status==='ok') statusH='<span class="co-status-ok">✓ OK</span>';
+    else if(c.status==='error') statusH='<span class="co-status-err">✗ Error</span>';
+    else if(c.status==='empty') statusH='<span class="co-status-err">Empty</span>';
+    else if(c.status==='skipped') statusH='<span class="co-status-skip">Skipped</span>';
+    rows+='<tr>';
+    rows+='<td style="font-weight:500">'+c.name+'</td>';
+    rows+='<td><span class="'+atsCls+'">'+c.ats+'</span></td>';
+    rows+='<td>'+c.stage+'</td>';
+    rows+='<td>'+c.vertical+'</td>';
+    rows+='<td>'+totalH+'</td>';
+    rows+='<td>'+matchH+'</td>';
+    rows+='<td style="font-size:12px;color:#888">'+scannedH+'</td>';
+    rows+='<td>'+statusH+'</td>';
+    rows+='<td><button class="co-del-btn" onclick="deleteCompany(\''+c.name.replace(/'/g,"\\'")+'\')">✕</button></td>';
+    rows+='</tr>';
+  }
+  if(!rows){
+    var msg=allCompanies.length?'No companies match filters':'No companies yet';
+    rows='<tr><td colspan="9" style="text-align:center;color:#888;padding:20px">'+msg+'</td></tr>';
+  }
+  document.getElementById('co-body').innerHTML=rows;
+}
+
+// ── Delete company ──
+async function deleteCompany(name){
+  if(!confirm('Remove '+name+' from your company list?'))return;
+  var r=await fetch('/api/companies/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+  var d=await r.json();
+  if(d.ok){showToast(name+' removed');loadCompanies();}
+  else{showToast('Error: '+(d.error||'unknown'));}
+}
+
+// ── Sort ───────────────────────────────────────────────────
+function setSort(mode){
+  sortMode=mode;
+  document.getElementById('sort-score').className='sort-btn'+(mode==='score'?' on':'');
+  document.getElementById('sort-date').className='sort-btn'+(mode==='date'?' on':'');
   render();
 }
 
+// ── Jobs render ────────────────────────────────────────────
 function render(){
   var list=document.getElementById('list');
-  var shown=jobs.filter(function(j){
-    if(filter==='5'&&j.match_score!==5)return false;
-    if(filter==='4'&&j.match_score!==4)return false;
-    if(filter==='3'&&j.match_score!==3)return false;
-    if(filter==='sel'&&!selected.has(j.job_url))return false;
+  var filtered=jobs.filter(function(j){
     if(filter==='fresh'&&(j.days_ago===null||j.days_ago===undefined||j.days_ago>14))return false;
     if(filter==='tailored'&&!tailoredUrls.has(j.job_url))return false;
-    if(filter==='com'){var c=comments[j.job_url];if(!c||(!c.text&&(!c.tags||!c.tags.length)))return false;}
+    if(scoreFilter.size>0&&!scoreFilter.has(j.match_score))return false;
+    if(vcFilter.size>0&&!vcFilter.has(j.vc||'__none__'))return false;
     if(q&&!(j.role_title+j.company_name).toLowerCase().includes(q))return false;
+    var js=jobStatus[j.job_url]||{};
+    var fRev=document.getElementById('f-reviewed').value;
+    var fApp=document.getElementById('f-applied').value;
+    if(fRev==='yes'&&!js.reviewed)return false;
+    if(fRev==='no'&&js.reviewed)return false;
+    if(fApp==='yes'&&!js.applied)return false;
+    if(fApp==='no'&&js.applied)return false;
     return true;
   });
+
+  // Sort: score desc then days_ago asc (primary), or days_ago asc then score desc
+  filtered.sort(function(a,b){
+    if(sortMode==='score'){
+      if(b.match_score!==a.match_score) return b.match_score-a.match_score;
+      var da=a.days_ago===null||a.days_ago===undefined?9999:a.days_ago;
+      var db=b.days_ago===null||b.days_ago===undefined?9999:b.days_ago;
+      return da-db;
+    } else {
+      var da=a.days_ago===null||a.days_ago===undefined?9999:a.days_ago;
+      var db=b.days_ago===null||b.days_ago===undefined?9999:b.days_ago;
+      if(da!==db) return da-db;
+      return b.match_score-a.match_score;
+    }
+  });
+
+  shownJobs=filtered;
   var html='';
-  for(var i=0;i<shown.length;i++){
-    var j=shown[i];var k=j.job_url;var isSel=selected.has(k);
+  for(var i=0;i<shownJobs.length;i++){
+    var j=shownJobs[i];
+    var k=j.job_url;
+    var isSel=selected.has(k);
     var isTailored=tailoredUrls.has(k);
-    var c=comments[k]||{text:'',tags:[]};var sc=j.match_score;
+    var c=comments[k]||{text:'',tags:[]};
+    var sc=j.match_score;
     var bc=sc===5?'b5':sc===4?'b4':'b3';
     var loc=j.remote_ok?'Remote':(j.location_raw||'?');
     var sqlH=j.sql_required?'<span class="sw">SQL req</span>':j.sql_mentioned?'<span class="sw">SQL mentioned</span>':'<span class="so">no SQL</span>';
-    var ek="'" + k + "'";
     var dateH=dateLabel(j.days_ago);
-    var tH='<span class="tl">Tags:</span>';
-    for(var t=0;t<TAGS.length;t++){
-      var tg=TAGS[t];
-      var tc=tg==='Apply now'?'tag good':(['SQL blocker','Too senior','Wrong vertical','Location issue'].indexOf(tg)>=0?'tag bad':'tag');
-      var ta=(c.tags||[]).indexOf(tg)>=0?' act':'';
-      tH+='<span class="'+tc+ta+'" onclick="toggleTag('+ek+','+JSON.stringify(tg)+')">'+tg+'</span>';
-    }
+    var tH='';
     var cardCls='card'+(isSel?' sel':'')+(isTailored?' tailored':'');
-    html+='<div class="'+cardCls+'"><div class="top">';
-    html+='<div class="cb'+(isSel?' on':'')+'" onclick="toggleSel('+ek+')">'+(isSel?'&#10003;':'')+'</div>';
-    html+='<div class="info"><div class="title">'+j.role_title+'<span class="badge '+bc+'">'+sc+'/5</span>'+(isTailored?'<span style="font-size:11px;color:#2563eb;margin-left:6px">&#10003; tailored</span>':'')+'</div>';
-    html+='<div class="meta"><span>'+j.company_name+'</span><span>'+loc+'</span><span>'+j.company_stage+'</span>'+dateH+sqlH+'</div></div>';
-    html+='<div class="acts"><a class="btn" href="'+j.apply_url+'" target="_blank">Apply</a><a class="btn" href="'+j.apply_url+'" target="_blank">View JD</a>';
-    html+='<button class="btn '+(isTailored?'blu':'grn')+'" onclick="tailorOrView(this)" data-key="'+k+'" data-idx="'+i+'" data-role="'+j.role_title.replace(/&/g,'and')+'" data-company="'+j.company_name.replace(/&/g,'and')+'">'+(isTailored?'Review / Re-tailor':'Tailor')+'</button></div>';
+    html+='<div class="'+cardCls+'" data-idx="'+i+'">';
+    html+='<div class="top">';
+    html+='<div class="cb'+(isSel?' on':'')+'" data-action="sel" data-idx="'+i+'">'+(isSel?'&#10003;':'')+'</div>';
+    html+='<div class="info">';
+    var fb=feedback[k]||null;
+    var mineBadge=(fb&&fb.manual_score)?'<span class="badge mine">Mine: '+fb.manual_score+'/5</span>':'';
+    html+='<div class="title">'+j.role_title+'<span class="badge '+bc+'">'+sc+'/5</span>'+mineBadge+(isTailored?'<span style="font-size:11px;color:#2563eb;margin-left:6px">&#10003; tailored</span>':'')+'</div>';
+    var vcH=j.vc?'<span class="badge vc">Backed by '+j.vc+'</span>':'';
+    html+='<div class="meta"><span>'+j.company_name+'</span>'+vcH+'<span>'+loc+'</span><span>'+j.company_stage+'</span>'+dateH+sqlH+'</div>';
     html+='</div>';
+    html+='<div class="acts">';
+    html+='<a class="btn" href="'+j.apply_url+'" target="_blank">Apply</a>';
+    html+='<a class="btn" href="'+j.apply_url+'" target="_blank">View JD</a>';
+    html+='<button class="btn '+(isTailored?'blu':'grn')+'" data-action="tailor" data-idx="'+i+'">'+(isTailored?'Review / Re-tailor':'Tailor')+'</button>';
+    html+='</div></div>';
     html+='<div class="reason">'+(j.reason||'')+'</div>';
-    html+='<div class="cmt"><textarea rows="1" placeholder="Add notes..." onchange="saveCmt('+ek+',this.value)">'+(c.text||'')+'</textarea>';
-    html+='<div class="tags">'+tH+'</div></div>';
-    html+='<div class="review-panel" id="rp-'+i+'" style="display:none">';
-    html+='<div class="review-tabs">';
-    html+='<div class="review-tab active" onclick="switchTab('+i+',\'draft\',this)">Draft</div>';
-    html+='<div class="review-tab" onclick="switchTab('+i+',\'revise\',this)">Revise</div>';
+    html+='<div class="cmt">';
+    html+='<textarea rows="1" placeholder="Add notes..." data-action="cmt" data-idx="'+i+'">'+(c.text||'')+'</textarea>';
+
+    var isRev=(jobStatus[k]||{}).reviewed||false;
+    var isApp=(jobStatus[k]||{}).applied||false;
+    html+='<div class="status-btns">';
+    html+='<button class="sbtn reviewed'+(isRev?' on':'')+'" data-action="reviewed" data-idx="'+i+'">'+( isRev?'✓ Reviewed':'Mark Reviewed')+'</button>';
+    html+='<button class="sbtn applied'+(isApp?' on':'')+'" data-action="applied" data-idx="'+i+'">'+( isApp?'✓ Applied':'Mark Applied')+'</button>';
     html+='</div>';
+    var curScore=fb?fb.manual_score:null;
+    var curCmt=fb?(fb.comment||''):'';
+    html+='<div class="fit-row">';
+    html+='<span class="fit-label">My fit:</span>';
+    for(var n=1;n<=5;n++){
+      html+='<button class="fbtn'+(curScore===n?' on':'')+'" data-action="fit" data-idx="'+i+'" data-val="'+n+'">'+n+'</button>';
+    }
+    html+='<div class="fit-cmt"><textarea data-action="fitcmt" data-idx="'+i+'" rows="2" placeholder="Why? (optional)">'+curCmt.replace(/</g,'&lt;')+'</textarea></div>';
+    html+='<button class="btn" data-action="fitsave" data-idx="'+i+'">Save</button>';
+    html+='<span class="fit-status" id="fst-'+i+'"></span>';
+    html+='</div>';
+    html+='</div>';
+    html+='<div class="review-panel" id="rp-'+i+'">';
     html+='<div class="review-content" id="rc-'+i+'">';
     html+='<div class="draft-text" id="dt-'+i+'">Loading draft...</div>';
+    html+='<p style="font-size:11px;color:#888;font-weight:500;margin:10px 0 5px">Revision comments</p>';
+    html+='<textarea id="rev-input-'+i+'" rows="3" placeholder="e.g. Make the summary shorter, emphasise marketplace experience more" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;background:#fafafa;color:#111"></textarea>';
+    html+='<div class="review-actions" style="margin-top:6px">';
+    html+='<button class="btn" data-action="revise" data-idx="'+i+'">Apply comments &#8635;</button>';
+    html+='<span id="rev-status-'+i+'" style="font-size:11px;color:#888"></span>';
+    html+='</div>';
+    html+='<hr style="border:none;border-top:1px solid #e5e5e5;margin:10px 0">';
     html+='<div class="review-actions">';
-    html+='<button class="btn grn" onclick="generatePDF('+i+','+ek+')">Generate PDF</button>';
+    html+='<button class="btn grn" data-action="pdf" data-idx="'+i+'">Generate PDF</button>';
     html+='<span id="pdf-status-'+i+'" style="font-size:11px;color:#888"></span>';
     html+='</div>';
-    html+='<div id="revise-panel-'+i+'" style="display:none;margin-top:10px">';
-    html+='<textarea id="rev-input-'+i+'" rows="3" placeholder="Describe changes... e.g. Make the summary shorter, emphasize marketplace experience more"></textarea>';
-    html+='<div class="review-actions">';
-    html+='<button class="btn grn" onclick="applyRevision('+i+','+ek+')">Apply comments</button>';
-    html+='<span id="rev-status-'+i+'" style="font-size:11px;color:#888"></span>';
-    html+='</div></div>';
     html+='</div></div></div>';
   }
   list.innerHTML=html||'<div style="padding:30px;text-align:center;color:#888">No jobs match filter</div>';
-  document.getElementById('st2').textContent=selected.size;
-  document.getElementById('st3').textContent=Object.values(comments).filter(function(c){return c.text||(c.tags&&c.tags.length);}).length;
+  var statusVals=Object.values(jobStatus);
+  document.getElementById('st2').textContent=statusVals.filter(function(s){return s&&s.reviewed;}).length;
+  document.getElementById('st3').textContent=statusVals.filter(function(s){return s&&s.applied;}).length;
   document.getElementById('bsel').textContent=selected.size;
+  updateBottomBar();
 }
 
-function toggleSel(k){
-  if(selected.has(k)){selected.delete(k);}else{selected.add(k);}
-  fetch('/api/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,selected:selected.has(k)})});
-  render();
-}
+// ── Card event delegation ──────────────────────────────────
+document.getElementById('list').addEventListener('click', function(e){
+  var el=e.target.closest('[data-action]');
+  if(!el)return;
+  var action=el.dataset.action;
+  var idx=parseInt(el.dataset.idx);
+  var j=shownJobs[idx];
+  if(!j)return;
+  var k=j.job_url;
+  if(action==='sel'){
+    if(selected.has(k)){selected.delete(k);}else{selected.add(k);}
+    fetch('/api/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,selected:selected.has(k)})});
+    render();
+  }
+  else if(action==='tag'){
+    var tag=el.dataset.tag;
+    if(!comments[k])comments[k]={text:'',tags:[]};
+    var tags=comments[k].tags||[];
+    var tidx=tags.indexOf(tag);
+    if(tidx>=0){tags.splice(tidx,1);}else{tags.push(tag);}
+    comments[k].tags=tags;
+    fetch('/api/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,text:comments[k].text||'',tags:tags})});
+    render();
+  }
+  else if(action==='tailor'){tailorOrView(idx,k,j.role_title,j.company_name);}
+  else if(action==='reviewed'||action==='applied'){
+    var cur=(jobStatus[k]||{})[action]||false;
+    var newVal=!cur;
+    if(!jobStatus[k])jobStatus[k]={};
+    jobStatus[k][action]=newVal;
+    fetch('/api/job_status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,field:action,value:newVal})});
+    render();
+  }
 
-function saveCmt(k,text){
+  else if(action==='pdf'){generatePDF(idx,k);}
+  else if(action==='revise'){applyRevision(idx,k);}
+  else if(action==='fit'){
+    var card=el.closest('.card');
+    if(!card)return;
+    card.querySelectorAll('.fbtn').forEach(function(b){b.classList.remove('on');});
+    el.classList.add('on');
+    var fst=document.getElementById('fst-'+idx);
+    if(fst){fst.textContent='unsaved';fst.classList.add('warn');}
+  }
+  else if(action==='fitsave'){
+    var card=el.closest('.card');
+    if(!card)return;
+    var on=card.querySelector('.fbtn.on');
+    var ta=card.querySelector('textarea[data-action="fitcmt"]');
+    var newScore=on?parseInt(on.dataset.val):null;
+    var newCmt=ta?ta.value.trim():'';
+    var prior=(feedback[k]||{}).manual_score;
+    if(prior===undefined)prior=null;
+    var fst=document.getElementById('fst-'+idx);
+    if(fst){fst.textContent='saving...';fst.classList.remove('warn');}
+    fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({key:k,manual_score:newScore,comment:newCmt,role_title:j.role_title||'',company_name:j.company_name||''})})
+      .then(function(r){return r.json();})
+      .then(function(resp){
+        if(!resp.ok){
+          if(fst){fst.textContent='save failed';fst.classList.add('warn');}
+          return;
+        }
+        if(newScore===null && !newCmt){delete feedback[k];}
+        else {feedback[k]={manual_score:newScore,comment:newCmt,updated:new Date().toISOString()};}
+        var titleEl=card.querySelector('.title');
+        var existingMine=titleEl.querySelector('.badge.mine');
+        if(existingMine)existingMine.remove();
+        if(newScore!==null){
+          var b=document.createElement('span');
+          b.className='badge mine';b.textContent='Mine: '+newScore+'/5';
+          var firstBadge=titleEl.querySelector('.badge');
+          if(firstBadge)firstBadge.insertAdjacentElement('afterend',b);
+        }
+        var msg;
+        if(prior!==null && newScore!==null && prior!==newScore){msg='Changed '+prior+' → '+newScore;}
+        else if(prior===null && newScore!==null){msg='Saved: '+newScore+'/5';}
+        else if(newScore===null && prior!==null){msg='Score cleared';}
+        else if(newScore!==null && prior===newScore){msg='Saved (no change)';}
+        else {msg='Saved';}
+        if(fst){fst.textContent='saved';fst.classList.remove('warn');}
+        showToast(msg,2200);
+        setTimeout(function(){if(fst&&fst.textContent==='saved')fst.textContent='';},2500);
+      })
+      .catch(function(){if(fst){fst.textContent='network error';fst.classList.add('warn');}});
+  }
+});
+
+document.getElementById('list').addEventListener('change', function(e){
+  var el=e.target.closest('[data-action="cmt"]');
+  if(!el)return;
+  var idx=parseInt(el.dataset.idx);
+  var j=shownJobs[idx];
+  if(!j)return;
+  var k=j.job_url;
   if(!comments[k])comments[k]={text:'',tags:[]};
-  comments[k].text=text;
-  fetch('/api/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,text:text,tags:comments[k].tags||[]})});
-  render();
+  comments[k].text=el.value;
+  fetch('/api/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,text:el.value,tags:comments[k].tags||[]})});
+});
+
+// ── Tailor / Review ────────────────────────────────────────
+function tailorOrView(idx,k,title,company){
+  var rp=document.getElementById('rp-'+idx);
+  if(!rp)return;
+  if(tailoredUrls.has(k)&&rp.style.display!=='block'){
+    rp.style.display='block';loadDraft(idx,k);return;
+  }
+  if(rp.style.display==='block'){rp.style.display='none';return;}
+  tailorJob(k,title,company);
 }
-
-function toggleTag(k,tag){
-  if(!comments[k])comments[k]={text:'',tags:[]};
-  var tags=comments[k].tags||[];
-  var idx=tags.indexOf(tag);
-  if(idx>=0){tags.splice(idx,1);}else{tags.push(tag);}
-  comments[k].tags=tags;
-  fetch('/api/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,text:comments[k].text||'',tags:tags})});
-  render();
+function loadDraft(idx,k){
+  var filename=tailoredFiles[k];
+  var el=document.getElementById('dt-'+idx);
+  if(!filename){if(el)el.textContent='No draft found';return;}
+  fetch('/api/tailored_resume_content?file='+encodeURIComponent(filename))
+    .then(function(r){return r.json();})
+    .then(function(d){if(el)el.textContent=d.content||d.error||'Could not load';});
 }
-
-function setF(el){document.querySelectorAll('.pill').forEach(function(p){p.classList.remove('on');});el.classList.add('on');filter=el.dataset.f;render();}
-function doSearch(v){q=v.toLowerCase();render();}
-
+function generatePDF(idx,k){
+  var filename=tailoredFiles[k];
+  if(!filename){showToast('No draft file found');return;}
+  var status=document.getElementById('pdf-status-'+idx);
+  if(status)status.textContent='Generating PDF...';
+  fetch('/api/generate_pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:filename})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){if(status)status.innerHTML='PDF ready! <a href="/api/download_pdf?file='+encodeURIComponent(d.pdf_filename)+'" style="color:#2563eb;text-decoration:underline" download>Download</a>';}
+      else{if(status)status.textContent='Error: '+(d.error||'unknown');}
+    });
+}
+function applyRevision(idx,k){
+  var filename=tailoredFiles[k];
+  var input=document.getElementById('rev-input-'+idx);
+  if(!filename||!input||!input.value.trim()){showToast('Add revision notes first');return;}
+  var status=document.getElementById('rev-status-'+idx);
+  if(status)status.textContent='Applying revision...';
+  fetch('/api/revise',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:filename,comments:input.value})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){
+        var dt=document.getElementById('dt-'+idx);
+        if(dt)dt.textContent=d.content;
+        if(status)status.textContent='Revision applied!';
+        if(input)input.value='';
+        showToast('Revision applied. Review draft and generate PDF when ready.');
+      }else{if(status)status.textContent='Error: '+(d.error||'unknown');}
+    });
+}
 function tailorJob(k,title,company){
   var job=jobs.find(function(j){return j.job_url===k;});
   if(!job)return;
@@ -230,14 +763,12 @@ function tailorJob(k,title,company){
   showToast('Tailoring started for '+title+' @ '+company+'. Takes ~30 seconds.',4000);
   pollTailorStatus();
 }
-
 function tailorSelected(){
   var sel=jobs.filter(function(j){return selected.has(j.job_url);});
   if(!sel.length){showToast('No jobs selected');return;}
   if(!confirm('Tailor resumes for '+sel.length+' selected jobs?'))return;
   sel.forEach(function(j){tailorJob(j.job_url,j.role_title,j.company_name);});
 }
-
 function pollTailorStatus(){
   var interval=setInterval(async function(){
     var r=await fetch('/api/tailor_status');
@@ -245,15 +776,12 @@ function pollTailorStatus(){
     var ts=document.getElementById('tailor-status');
     if(s.status==='done'){
       ts.textContent='';ts.style.display='none';
-      showToast('Resume tailored! Click Tailor button to review draft.',4000);
-      var tr2=await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
-      tr2.forEach(function(t){tailoredFiles[t.job_url]=t.tailored_file;});
+      showToast('Resume tailored! Click Review/Re-tailor to see draft.',4000);
       var tr=await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
       tailoredUrls=new Set(tr.map(function(t){return t.job_url;}));
-  tr.forEach(function(t){tailoredFiles[t.job_url]=t.tailored_file;});
-      render();
-      clearInterval(interval);
-    } else if(s.status==='error'){
+      tr.forEach(function(t){tailoredFiles[t.job_url]=t.tailored_file;});
+      render();clearInterval(interval);
+    }else if(s.status==='error'){
       ts.textContent='Tailor error';
       showToast('Tailor error: '+s.error,5000);
       clearInterval(interval);
@@ -261,6 +789,7 @@ function pollTailorStatus(){
   },3000);
 }
 
+// ── Scan ───────────────────────────────────────────────────
 var scanPolling=null;
 function runScan(){
   var btn=document.getElementById('scan-btn');
@@ -283,86 +812,358 @@ function runScan(){
   },5000);
 }
 
+// ── Filters / Search ───────────────────────────────────────
+function setF(el){
+  document.querySelectorAll('.pill').forEach(function(p){p.classList.remove('on');});
+  el.classList.add('on');filter=el.dataset.f;render();
+}
+function doSearch(v){q=v.toLowerCase();render();}
+
+function onScoreToggle(){
+  scoreFilter=new Set();
+  document.querySelectorAll('#ms-score-panel input:checked').forEach(function(c){
+    scoreFilter.add(parseInt(c.value,10));
+  });
+  var ms=document.getElementById('ms-score');
+  var sum=document.getElementById('ms-score-sum');
+  if(scoreFilter.size===0){sum.textContent='Score: All';ms.classList.remove('active');}
+  else{
+    var arr=Array.from(scoreFilter).sort(function(a,b){return b-a;});
+    sum.textContent='Score: '+arr.map(function(s){return s+'/5';}).join(', ');
+    ms.classList.add('active');
+  }
+  render();
+}
+
+function onVcToggle(){
+  vcFilter=new Set();
+  document.querySelectorAll('#ms-vc-panel input:checked').forEach(function(c){
+    vcFilter.add(c.value);
+  });
+  var ms=document.getElementById('ms-vc');
+  var sum=document.getElementById('ms-vc-sum');
+  if(vcFilter.size===0){sum.textContent='Backed by: All';ms.classList.remove('active');}
+  else if(vcFilter.size===1){
+    var v=Array.from(vcFilter)[0];
+    sum.textContent='Backed by: '+(v==='__none__'?'(none)':v);
+    ms.classList.add('active');
+  }
+  else{sum.textContent='Backed by: '+vcFilter.size+' selected';ms.classList.add('active');}
+  render();
+}
+
+function populateVcFilter(){
+  var panel=document.getElementById('ms-vc-panel');
+  if(!panel||panel.dataset.populated==='1')return;
+  var counts={};
+  jobs.forEach(function(j){var k=j.vc||'__none__';counts[k]=(counts[k]||0)+1;});
+  var entries=Object.keys(counts).map(function(k){return [k,counts[k]];});
+  entries.sort(function(a,b){
+    if(a[0]==='__none__')return 1;
+    if(b[0]==='__none__')return -1;
+    return b[1]-a[1];
+  });
+  var html='';
+  entries.forEach(function(e){
+    var label=e[0]==='__none__'?'(none)':e[0];
+    html+='<label><input type="checkbox" value="'+e[0]+'" onchange="onVcToggle()">'+label+' <span style="color:#999;margin-left:auto">'+e[1]+'</span></label>';
+  });
+  panel.innerHTML=html;
+  panel.dataset.populated='1';
+}
+
+document.addEventListener('click',function(e){
+  document.querySelectorAll('details.ms[open]').forEach(function(d){
+    if(!d.contains(e.target))d.removeAttribute('open');
+  });
+});
+
+// ── Add Company modal ──────────────────────────────────────
+var acDetected=null;
+function openAddCompany(){
+  document.getElementById('ac-modal').classList.add('open');
+  document.getElementById('ac-name').focus();
+  resetAddCompany();
+}
+function closeAddCompany(){
+  document.getElementById('ac-modal').classList.remove('open');
+}
+function resetAddCompany(){
+  acDetected=null;
+  ['ac-card','ac-spinner','ac-meta-row','ac-result','ac-manual'].forEach(function(id){
+    document.getElementById(id).style.display='none';
+  });
+  document.getElementById('ac-card').className='detect-card';
+  document.getElementById('ac-confirm-btn').style.display='none';
+  document.getElementById('ac-detect-btn').style.display='inline-block';
+  document.getElementById('ac-name').value='';
+}
+async function detectCompany(){
+  var name=document.getElementById('ac-name').value.trim();
+  if(!name){showToast('Enter a company name first');return;}
+  document.getElementById('ac-spinner').style.display='block';
+  document.getElementById('ac-detect-btn').disabled=true;
+  ['ac-card','ac-meta-row','ac-confirm-btn'].forEach(function(id){document.getElementById(id).style.display='none';});
+  try{
+    var r=await fetch('/api/add_company/detect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+    var d=await r.json();
+    document.getElementById('ac-spinner').style.display='none';
+    document.getElementById('ac-detect-btn').disabled=false;
+    var card=document.getElementById('ac-card');
+    card.style.display='block';
+    if(d.found){
+      card.className='detect-card';
+      acDetected={ats:d.ats,slug:d.slug};
+      document.getElementById('ac-card-title').textContent='Found on '+d.ats.charAt(0).toUpperCase()+d.ats.slice(1)+' — slug: '+d.slug;
+      document.getElementById('ac-card-meta').textContent=d.total_jobs+' total jobs on their board';
+      var jh='<strong style="font-size:11px;color:#555">Sample roles:</strong>';
+      (d.sample_titles||[]).forEach(function(t){if(t)jh+='<span>· '+t+'</span>';});
+      document.getElementById('ac-card-jobs').innerHTML=jh;
+      document.getElementById('ac-manual').style.display='none';
+      document.getElementById('ac-confirm-btn').style.display='inline-block';
+    }else{
+      card.className='detect-card err';
+      document.getElementById('ac-card-title').textContent='ATS not auto-detected';
+      document.getElementById('ac-card-meta').textContent='Tried: '+(d.tried_slugs||[]).join(', ');
+      document.getElementById('ac-card-jobs').textContent='Enter ATS and slug manually:';
+      document.getElementById('ac-manual').style.display='block';
+      document.getElementById('ac-confirm-btn').style.display='inline-block';
+    }
+    document.getElementById('ac-meta-row').style.display='flex';
+  }catch(e){
+    document.getElementById('ac-spinner').style.display='none';
+    document.getElementById('ac-detect-btn').disabled=false;
+    showToast('Detection failed: '+e.message);
+  }
+}
+async function confirmAddCompany(){
+  var name=document.getElementById('ac-name').value.trim();
+  var stage=document.getElementById('ac-stage').value;
+  var vertical=document.getElementById('ac-vertical').value;
+  var ats,slug;
+  if(acDetected){ats=acDetected.ats;slug=acDetected.slug;}
+  else{
+    ats=document.getElementById('ac-ats').value;
+    slug=document.getElementById('ac-slug').value.trim();
+    if(!slug){showToast('Enter a slug to continue');return;}
+  }
+  var btn=document.getElementById('ac-confirm-btn');
+  btn.disabled=true;btn.textContent='Adding...';
+  try{
+    var r=await fetch('/api/add_company/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,ats:ats,slug:slug,stage:stage,vertical:vertical})});
+    var d=await r.json();
+    btn.disabled=false;btn.textContent='Add to Scout';
+    if(d.ok){
+      var res=document.getElementById('ac-result');
+      res.style.display='block';res.textContent=d.message;
+      showToast(name+' added! Run a scan to pull their jobs.',4000);
+      setTimeout(function(){closeAddCompany();loadCompanies();},1800);
+    }else{showToast('Error: '+(d.error||'unknown'));}
+  }catch(e){
+    btn.disabled=false;btn.textContent='Add to Scout';
+    showToast('Failed: '+e.message);
+  }
+}
+document.addEventListener('DOMContentLoaded',function(){
+  var inp=document.getElementById('ac-name');
+  if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter')detectCompany();});
+  // Hide bottom bar on companies tab by default
+  document.getElementById('bottom-bar').style.display='none';
+});
+
+// ── Init ───────────────────────────────────────────────────
 load();
 
-function tailorOrView(el) {
-  var k = el.dataset.key;
-  var idx = el.dataset.idx;
-  var title = el.dataset.role;
-  var company = el.dataset.company;
-  var rp = document.getElementById('rp-'+idx);
-  if (!rp) return;
-  // If already tailored and panel closed, open it to show draft
-  if (tailoredUrls.has(k) && rp.style.display !== 'block') {
-    rp.style.display = 'block';
-    loadDraft(idx, k);
-    return;
-  }
-  // If panel already open, close it
-  if (rp.style.display === 'block') {
-    rp.style.display = 'none';
-    return;
-  }
-  // Otherwise tailor fresh
-  tailorJob(k, title, company);
+// ── Manual Tailor tab ──────────────────────────────────────
+var mtUseText = false;
+var mtCurrentFile = null;
+
+function toggleMtInput(){
+  mtUseText = !mtUseText;
+  document.getElementById('mt-url-field').style.display  = mtUseText ? 'none'  : 'block';
+  document.getElementById('mt-text-field').style.display = mtUseText ? 'block' : 'none';
 }
 
-function loadDraft(idx, k) {
-  var filename = tailoredFiles[k];
-  if (!filename) { document.getElementById('dt-'+idx).textContent = 'No draft found'; return; }
-  fetch('/api/tailored_resume_content?file='+encodeURIComponent(filename))
-    .then(function(r){return r.json();})
-    .then(function(d){
-      var el = document.getElementById('dt-'+idx);
-      if (el) el.textContent = d.content || d.error || 'Could not load';
-    });
+
+
+async function runManualTailor(){
+  var role    = document.getElementById('mt-role').value.trim();
+  var company = document.getElementById('mt-company').value.trim();
+  var url     = document.getElementById('mt-url').value.trim();
+  var jdText  = document.getElementById('mt-jd-text').value.trim();
+  var version = document.getElementById('mt-version').value.trim();
+
+  if(!role || !company){ showToast('Role title and company name are required'); return; }
+  if(!mtUseText && !url){ showToast('Enter a job URL'); return; }
+  if(mtUseText && !jdText){ showToast('Paste the job description text'); return; }
+
+  var btn = document.getElementById('mt-tailor-btn');
+  var status = document.getElementById('mt-status');
+  btn.disabled = true; btn.textContent = 'Tailoring...';
+  status.textContent = 'Starting...';
+  document.getElementById('mt-result').style.display = 'none';
+  mtCurrentFile = null;
+
+  var payload = {role_title: role, company_name: company};
+  if(mtUseText){ payload.jd_text = jdText; payload.job_url = ''; }
+  else { payload.job_url = url; payload.jd_text = ''; }
+  if(version) payload.version = version;
+
+  await fetch('/api/tailor_manual', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+
+  pollMtStatus(role, company, btn, status);
 }
 
-function switchTab(idx, tab, el) {
-  document.querySelectorAll('#rp-'+idx+' .review-tab').forEach(function(t){t.classList.remove('active');});
-  el.classList.add('active');
-  var rp = document.getElementById('revise-panel-'+idx);
-  if (tab === 'revise') { if(rp) rp.style.display='block'; }
-  else { if(rp) rp.style.display='none'; }
-}
-
-function generatePDF(idx, k) {
-  var filename = tailoredFiles[k];
-  if (!filename) { showToast('No draft file found'); return; }
-  var status = document.getElementById('pdf-status-'+idx);
-  if (status) { status.textContent = 'Generating PDF...'; }
-  fetch('/api/generate_pdf', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:filename})})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) {
-        if (status) status.innerHTML = 'PDF ready! <a href="/api/download_pdf?file='+encodeURIComponent(d.pdf_filename)+'" style="color:#2563eb;text-decoration:underline" download>Download</a>';
+function pollMtStatus(role, company, btn, status){
+  var interval = setInterval(async function(){
+    var r = await fetch('/api/tailor_status');
+    var s = await r.json();
+    if(s.status === 'done'){
+      clearInterval(interval);
+      btn.disabled = false; btn.textContent = 'Tailor Resume';
+      status.textContent = '';
+      // Find the file that was just created
+      var tr = await fetch('/api/tailored_resumes').then(function(r){return r.json();}).catch(function(){return [];});
+      // Match by company name (most recently added entry)
+      var match = null;
+      for(var i = tr.length-1; i >= 0; i--){
+        if(tr[i].company_name && tr[i].company_name.toLowerCase() === company.toLowerCase()){
+          match = tr[i]; break;
+        }
+      }
+      if(!match && tr.length) match = tr[tr.length-1];
+      if(match){
+        mtCurrentFile = match.tailored_file;
+        document.getElementById('mt-result-title').textContent = 'Resume ready — ' + role + ' @ ' + company;
+        // Load draft content
+        fetch('/api/tailored_resume_content?file=' + encodeURIComponent(mtCurrentFile))
+          .then(function(r){return r.json();})
+          .then(function(d){
+            document.getElementById('mt-draft-text').textContent = d.content || d.error || 'Could not load';
+          });
+        document.getElementById('mt-result').style.display = 'block';
+        showToast('Resume tailored! Review draft below.', 4000);
       } else {
-        if (status) status.textContent = 'Error: ' + (d.error||'unknown');
+        status.textContent = 'Done but file not found — check tailored/ folder';
+      }
+    } else if(s.status === 'error'){
+      clearInterval(interval);
+      btn.disabled = false; btn.textContent = 'Tailor Resume';
+      status.textContent = 'Error: ' + (s.error || 'unknown');
+      showToast('Tailor error: ' + (s.error || ''), 6000);
+    } else {
+      status.textContent = 'Running... (' + (s.role || '') + ')';
+    }
+  }, 3000);
+}
+
+function generateMtPDF(){
+  if(!mtCurrentFile){ showToast('No file to generate PDF from'); return; }
+  var pdfStatus = document.getElementById('mt-pdf-status');
+  var role = document.getElementById('mt-role').value.trim();
+  var company = document.getElementById('mt-company').value.trim();
+  pdfStatus.textContent = 'Generating PDF...';
+  fetch('/api/generate_pdf', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename: mtCurrentFile, role_title: role, company_name: company})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){
+        var dlUrl = '/api/download_pdf?file=' + encodeURIComponent(d.pdf_filename);
+        pdfStatus.innerHTML = 'PDF ready! <a href="' + dlUrl + '" style="color:#2563eb;text-decoration:underline" download>Download</a>';
+      } else {
+        pdfStatus.textContent = 'Error: ' + (d.error || 'unknown');
       }
     });
 }
 
-function applyRevision(idx, k) {
-  var filename = tailoredFiles[k];
-  var comments = document.getElementById('rev-input-'+idx);
-  if (!filename || !comments || !comments.value.trim()) { showToast('Add revision notes first'); return; }
-  var status = document.getElementById('rev-status-'+idx);
-  if (status) status.textContent = 'Applying revision...';
-  fetch('/api/revise', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename:filename, comments:comments.value})})
+function applyMtRevision(){
+  if(!mtCurrentFile){ showToast('No file to revise'); return; }
+  var input = document.getElementById('mt-rev-input');
+  if(!input || !input.value.trim()){ showToast('Add revision notes first'); return; }
+  var revStatus = document.getElementById('mt-rev-status');
+  revStatus.textContent = 'Applying revision...';
+  fetch('/api/revise', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({filename: mtCurrentFile, comments: input.value})})
     .then(function(r){return r.json();})
     .then(function(d){
-      if (d.ok) {
-        var dt = document.getElementById('dt-'+idx);
-        if (dt) dt.textContent = d.content;
-        if (status) status.textContent = 'Revision applied!';
-        if (comments) comments.value = '';
-        showToast('Revision applied. Review draft and generate PDF when ready.');
+      if(d.ok){
+        document.getElementById('mt-draft-text').textContent = d.content;
+        revStatus.textContent = 'Revision applied!';
+        input.value = '';
+        document.getElementById('mt-pdf-status').textContent = '';
+        showToast('Revision applied. Generate PDF when ready.', 3000);
       } else {
-        if (status) status.textContent = 'Error: '+(d.error||'unknown');
+        revStatus.textContent = 'Error: ' + (d.error || 'unknown');
       }
     });
 }
 
 </script>
+
+<!-- ══════════════ MANUAL TAILOR TAB ══════════════ -->
+<div class="tab-pane" id="pane-manual">
+  <div class="mt-wrap">
+
+    <div class="mt-card">
+      <h4>Job Details</h4>
+
+      <!-- JD source: URL or raw text -->
+      <div class="mt-field" id="mt-url-field">
+        <label>Job Description URL</label>
+        <input type="text" id="mt-url" placeholder="https://jobs.ashbyhq.com/company/abc123">
+        <span class="mt-toggle" onclick="toggleMtInput()">Paste JD text instead</span>
+      </div>
+      <div class="mt-field" id="mt-text-field" style="display:none">
+        <label>Job Description (raw text)</label>
+        <textarea id="mt-jd-text" placeholder="Paste the full job description here..."></textarea>
+        <span class="mt-toggle" onclick="toggleMtInput()">Use URL instead</span>
+      </div>
+
+      <div class="mt-row">
+        <div class="mt-field">
+          <label>Role Title *</label>
+          <input type="text" id="mt-role" placeholder="e.g. GTM Strategy and Operations">
+        </div>
+        <div class="mt-field">
+          <label>Company Name *</label>
+          <input type="text" id="mt-company" placeholder="e.g. Harvey">
+        </div>
+      </div>
+
+      <div class="mt-field" style="max-width:180px">
+        <label>Version suffix (optional)</label>
+        <input type="text" id="mt-version" placeholder="e.g. v2">
+      </div>
+
+      <div style="display:flex;align-items:center;margin-top:4px">
+        <button class="btn grn" id="mt-tailor-btn" onclick="runManualTailor()">Tailor Resume</button>
+        <span class="mt-status" id="mt-status"></span>
+      </div>
+    </div>
+
+    <!-- Result panel — shown after tailoring completes -->
+    <div class="mt-result" id="mt-result">
+      <div class="mt-result-header" id="mt-result-title">Resume ready</div>
+      <div class="mt-result-body">
+        <div class="mt-draft-text" id="mt-draft-text">Loading...</div>
+        <p class="mt-comment-label">Revision comments</p>
+        <textarea class="mt-comment-box" id="mt-rev-input" placeholder="e.g. Make the summary more concise. Emphasise partnership deal closures in bullet 2."></textarea>
+        <div class="mt-actions" style="margin-top:8px">
+          <button class="btn" onclick="applyMtRevision()">Apply comments &#8635;</button>
+          <span id="mt-rev-status" style="font-size:11px;color:#888"></span>
+        </div>
+        <hr class="mt-divider">
+        <div class="mt-actions">
+          <button class="btn grn" onclick="generateMtPDF()">Generate PDF</button>
+          <span id="mt-pdf-status" style="font-size:11px;color:#888"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 </body>
 </html>

@@ -1,0 +1,44 @@
+PRATYUSH PAUL
+(312) 678-3629 | pratyushpaul93@gmail.com | linkedin.com/in/pratyushpaul | github.com/pratyushpaul93-coder
+
+SUMMARY
+Technical program manager with 6+ years driving cross-functional product launches and coordinating complex programs across engineering and go-to-market teams. Expert in managing technical dependencies, translating between stakeholders, and delivering high-stakes launches at pace while maintaining quality and reliability. Proven track record orchestrating end-to-end initiatives from technical planning through execution at high-growth technology companies and top-tier management consulting.
+
+CORE EXPERIENCE
+
+Armor Defense, USA (Remote, Chicago)
+Senior Technical Product Manager | May 2025 - Present
+- Led end-to-end migration of cybersecurity technology platform used by 400+ clients, coordinating across engineering and infrastructure teams to reach 80% adoption within 3 months while retaining 98% of clients
+- Orchestrated launch of container runtime security product from technical planning through go-to-market execution, managing dependencies across engineering workstreams to unlock customer segment projected to generate $2M revenue within first year
+- Built operational frameworks analyzing customer feedback to identify system inefficiencies, coordinated technical improvements across teams that reduced engineering overhead by 50%
+
+Strategy&, Dubai
+Senior Associate | Oct 2022 - Jan 2024
+- Orchestrated strategic planning and execution for merger of 2 IoT leaders in KSA, coordinating across technical and business stakeholders to design operating model leading to 95% employee retention
+- Drove acquisition target analysis program for Telco client, managing cross-functional research and financial modeling workstreams to recommend $10M+ targets expanding portfolio by 30%
+- Coordinated complex stakeholder alignment to generate strategic 5-year revenue projections and financial forecasts for Kuwaiti Telco subsidiary, translating technical capabilities into business insights
+- Developed comprehensive governance and reporting frameworks covering sales performance, technology deployment, and strategic initiative tracking, enhancing program visibility and accelerating implementation
+
+Urban Company, Singapore
+Strategy and Operations Manager | Jan 2022 - Aug 2022
+- Built and coordinated 2-person cross-functional team driving operational improvements for largest service category, delivering 25% increase in monthly orders, 15-point NPS rise to 45, and 10% boost in cleaner ratings
+- Led strategic initiative to re-launch service category, orchestrating technical and operational teams to design frameworks for pricing, quality and hyperlocal acquisition achieving target unit economics
+- Partnered across teams to analyze satisfaction data and implement targeted lifecycle interventions that increased provider earnings 15% and improved customer retention 25%
+- Optimized agency partnership programs through cross-functional coordination, delivering 10% cost reduction and 15% improvement in service quality
+
+Accenture, Singapore
+Management Consultant | Mar 2018 - Dec 2021
+- Orchestrated B2B marketplace launch program coordinating across technical and business teams, managing complex dependencies in competitor analysis, segmentation, pricing and operations to generate $1.2M in sales within 3 months
+- Built demand forecasting model for global shipping giant, coordinating technical implementation across 300+ ports worldwide to improve forecasting efficiency by 1% and generate ~$4M annual savings
+- Directed cross-functional team of 4 analysts conducting comprehensive market research, coordinating stakeholder alignment to optimize spend allocation and drive 20% ROI increase for big tech APAC HQ
+- Managed end-to-end $5M strategic initiative for gaming client, orchestrating alignment between business requirements and technical solutions across multiple workstreams
+
+AI/TECHNICAL PROJECTS
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
+- OpenClaw Job Hunting Pipeline: Intelligent scraping (SEC form D, VC portfolios) 100's of target companies and automation scanning via ATS APIs, DeepSeek scoring, Flask dashboard
+
+EDUCATION AND OTHER EXPERIENCES
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014

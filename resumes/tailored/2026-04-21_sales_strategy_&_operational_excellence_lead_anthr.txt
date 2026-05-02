@@ -1,0 +1,44 @@
+PRATYUSH PAUL
+(312) 678-3629 | pratyushpaul93@gmail.com | LinkedIn
+
+SUMMARY
+Sales strategy and operations leader with 6+ years driving operational excellence, forecasting cadence, and GTM planning across high-growth technology companies and top-tier management consulting. Expert in building operating standards, managing planning cycles, and translating complex data into executive insights that drive cross-functional accountability and revenue growth.
+
+CORE EXPERIENCE
+
+Armor Defense, USA (Remote, Chicago)
+Senior Technical Product Manager | May 2025 - Present
+- Led migration of cybersecurity technology platform providing secure monitored cloud infrastructure with inheritable compliance used by 400+ clients, established operating standards and reaching 80% adoption within 3 months while retaining 98% of clients
+- Managed end-to-end initiative to launch new product offering (container runtime security), analyzing market opportunity and business metrics to unlock customer segment projected to generate $2M revenue within first year
+- Analyzed customer tickets to identify operational inefficiencies, designed and implemented system improvements that reduced engineering overhead by 50%, enabling team to focus on strategic product development
+
+Strategy&, Dubai
+Senior Associate | Oct 2022 - Jan 2024
+- Led strategic planning and execution for merger of 2 IoT leaders in KSA, designed operating model harmonizing operations and systems across sales teams, leading to 95% employee retention and operational cohesiveness
+- Led acquisition target analysis for Telco client, conducting financial modeling and building comp plan models to recommend $10M+ targets that expanded product portfolio by 30% and entered 2 new segments
+- Generated strategic 5-year revenue projections and financial forecasts for Kuwaiti Telco subsidiary, translating complex market data into executive insights for expansion and investment decisions
+- Developed and deployed comprehensive governance and reporting systems covering sales performance, pipeline forecasting, and strategic initiative tracking, enhancing transparency and accelerating implementation
+
+Urban Company, Singapore
+Strategy and Operations Manager | Jan 2022 - Aug 2022
+- Built and led 2-person team driving operational excellence for largest service category, implemented forecasting cadence and performance standards resulting in 25% increase in monthly orders, 15-point NPS rise to 45, and 10% boost in cleaner ratings
+- Led strategic initiative to re-launch service category, designed operational frameworks and quota deployment process for pricing, quality and hyperlocal acquisition to achieve target unit economics
+- Analyzed customer and provider satisfaction data to increase customer lifetime value, implemented targeted interventions that increased provider earnings by 15% and customer retention by 25%
+- Optimized agency partnerships through standardized operating procedures and performance tracking, resulting in 10% cost reduction and 15% improvement in service quality
+
+Accenture, Singapore
+Management Consultant | Mar 2018 - Dec 2021
+- Designed and implemented B2B marketplace launch strategy including target setting, territory planning, and operational standards across competitor analysis, segmentation, and pricing, generating $1.2M in sales across Southeast Asian markets within first 3 months
+- Created demand forecasting model for global shipping giant to optimize allocation of empty containers across 300+ ports worldwide, improving forecasting efficiency by 1% and generating ~$4M in annual savings
+- Directed team of 4 analysts in comprehensive market analysis, built structured data models and performance tracking systems that drove 20% ROI increase for big tech APAC HQ
+- Program-managed $5M strategic initiative for gaming client, led cross-functional collaboration aligning business requirements with technical solutions across multiple teams and deadlines
+
+AI/TECHNICAL PROJECTS
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
+- OpenClaw Job Hunting Pipeline: Job search automation scanning 100+ companies via ATS APIs, DeepSeek scoring, Flask dashboard
+
+EDUCATION AND OTHER EXPERIENCES
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
