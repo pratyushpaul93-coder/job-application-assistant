@@ -14,7 +14,7 @@ Generic job boards and mass-apply tools optimize for volume. For senior strategy
 
 This pipeline is built around three constraints:
 
-1. **No hallucination on job listings.** Every role comes from a real ATS, never an LLM-generated summary.
+1. **No hallucination on job listings.** Every role comes from a real ATS.
 2. **LLMs only where reasoning is needed.** Scoring and resume tailoring, nothing else.
 3. **Human-in-the-loop always.** The system never auto-submits applications.
 
