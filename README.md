@@ -33,7 +33,7 @@ Once a company is in the target list, the daily pipeline runs automatically:
 1. **Scout** scans every target company by hitting their public ATS JSON endpoints — no scraping, no Playwright, no auth — and applies title and JD pattern filters from a config file.
 2. **Matcher** scores every fresh role 1–5 using DeepSeek V3 (~$0.002 per job), grounded by a feedback loop that incorporates the user's prior comments and dashboard signals.
 3. **Dashboard** surfaces the shortlist with filters, posting-date freshness, comments, and a per-job tailor button.
-4. **Tailor** rewrites the master resume against the live JD using Claude Sonnet 4 (~$0.05 per resume), governed by a strict framework that prevents fabrication and enforces structural rules.
+4. **Tailor** rewrites the master resume against the live JD using Claude Sonnet 4.6 (~$0.05 per resume), governed by a strict framework that prevents fabrication and enforces structural rules.
 5. **PDF generator** produces a 1-page PDF using a custom Clean Classic template that auto-tightens spacing to fit one page.
 6. The user reviews, downloads, and submits manually.
 
@@ -47,10 +47,11 @@ Total cost to operate end-to-end is roughly **$2–3/month** in API spend plus V
 
 | Component | Script | Tool | Why |
 |-----------|--------|------|-----|
-| Scout | `ats_scout.py` | ATS JSON APIs | Zero hallucination, zero auth, ~30 sec runtime |
-| Matcher | `ats_matcher.py` | DeepSeek V3 | Cheap reasoning ($0.002/job) for relevance scoring |
+| Scout | `ats_scout.py` | ATS JSON APIs (no LLM) | Zero hallucination, zero auth, ~30 sec runtime |
+| Matcher | `ats_matcher.py` | DeepSeek V3 (`deepseek-chat`) | Cheap reasoning ($0.002/job) for relevance scoring |
 | Dashboard | `dashboard.py` + `dashboard_ui.html` | Flask + vanilla JS | Local review UI, no deployment overhead |
-| Resume Tailor | `tailor.py` | Claude Sonnet 4 | Quality matters — used sparingly, only on selected roles |
+| Resume Tailor | `tailor.py` | Claude Sonnet 4.6 (`claude-sonnet-4-6`) | Quality matters — used sparingly, only on selected roles |
+| Resume Revise | `dashboard.py` (inline editor) | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Fast follow-up edits to an already-tailored resume — Haiku is sufficient for revision instructions |
 | PDF Generator | `generate_pdf.py` | WeasyPrint | Open-source, deterministic, no template lock-in |
 | VC Sourcing | `getro_scraper.py` | Getro internal APIs | ~2,000 companies across 6 top-tier VCs |
 | Bulk Onboarding | `bulk_add_companies.py`, `ats_scout_getro_bulk_add.py` | ATS auto-detection | Batch-imports VC scrape results into the daily Scout |
@@ -60,7 +61,7 @@ Total cost to operate end-to-end is roughly **$2–3/month** in API spend plus V
 ```
 ats_scout.py  →  raw_jobs.json
                       ↓
-ats_matcher.py  →  shortlist.json + whatsapp_message.txt
+ats_matcher.py  →  shortlist.json
                       ↓
               Dashboard (review)
                       ↓
@@ -119,7 +120,7 @@ For each fresh job pulled by Scout, the Matcher calls DeepSeek V3 once to score 
 - **2** — Adjacent role or weak company fit
 - **1** — Skip
 
-Output is `shortlist.json` filtered to scores of 3+, plus a formatted WhatsApp digest.
+Output is `shortlist.json` filtered to scores of 3+.
 
 The Matcher reads `feedback.json` on every run, which aggregates dashboard comments and reviewed/applied state from prior cycles. This creates a closed loop: comments left on a job ("too junior," "wrong stack," "great fit") shape how similar roles get scored next time.
 
@@ -138,7 +139,7 @@ A Flask app that runs as a `systemd` service and survives reboots. Accessible fr
 - Search — by role or company
 - Job cards — score badge, company, location, stage, posting date with freshness color, SQL flag
 - Per-job actions — Apply (deep link to ATS), View JD, Tailor (fires `tailor.py`, polls until done), Comment (free text, fed into Matcher feedback loop), Mark Reviewed, Mark Applied
-- Bulk actions — Tailor selected, Send to WhatsApp
+- Bulk actions — Tailor selected
 - Resume review panel — Draft tab (current `.txt`), Revise tab (free-text comments → Apply), Generate PDF, inline Download
 - Add Company — type a company name, the system auto-detects ATS and adds it to the daily Scout
 
@@ -160,7 +161,7 @@ A Flask app that runs as a `systemd` service and survives reboots. Accessible fr
 
 ## Resume Tailor
 
-The hardest component of the pipeline. The naive version — "give an LLM a JD and a resume, ask for a tailored version" — fabricates metrics, drops bullets, reorders sections randomly, and tends to overflow to 1.3 pages. The current implementation is a heavily-constrained Sonnet 4 prompt governed by an explicit framework.
+The hardest component of the pipeline. The naive version — "give an LLM a JD and a resume, ask for a tailored version" — fabricates metrics, drops bullets, reorders sections randomly, and tends to overflow to 1.3 pages. The current implementation is a heavily-constrained Sonnet 4.6 prompt governed by an explicit framework.
 
 ### The PP Resume Update Framework
 
@@ -228,10 +229,10 @@ job-application-assistant/
 ├── README.md                              ← this file
 ├── scripts/
 │   ├── ats_scout.py                       ← Scout (Ashby/Greenhouse/Lever) with config-driven filters
-│   ├── ats_matcher.py                     ← DeepSeek scoring + feedback loop + WhatsApp digest
+│   ├── ats_matcher.py                     ← DeepSeek scoring + feedback loop
 │   ├── dashboard.py                       ← Flask backend
 │   ├── dashboard_ui.html                  ← Frontend
-│   ├── tailor.py                          ← Claude Sonnet 4 tailor with framework rules
+│   ├── tailor.py                          ← Claude Sonnet 4.6 tailor with framework rules
 │   ├── generate_pdf.py                    ← WeasyPrint PDF generator
 │   │
 │   ├── getro_scraper.py                   ← Production VC portfolio scraper (CSV output, --all/--vc modes)
@@ -293,14 +294,13 @@ python3 scripts/dashboard.py    # then open http://localhost:5000
 - Deduplication in Scout output (same role can appear across multiple ATS instances)
 - `applied_history.json` to flag already-applied companies in fresh scans
 - Wire the Form D scraper into the daily pipeline as a "newly-funded" sourcing signal
-- WhatsApp gateway pairing
 - Browser agent for assisted (not autonomous) form-filling
 
 ---
 
 ## Tech stack
 
-Python 3.12 · Flask · WeasyPrint · DeepSeek V3 · Claude Sonnet 4 · Hetzner CX21 · systemd · vanilla JS (no framework)
+Python 3.12 · Flask · WeasyPrint · DeepSeek V3 · Claude Sonnet 4.6 · Claude Haiku 4.5 · Hetzner CX21 · systemd · vanilla JS (no framework)
 
 ---
 

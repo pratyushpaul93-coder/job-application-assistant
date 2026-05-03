@@ -133,23 +133,6 @@ def score_job(job, api_key, few_shot_block=''):
     except Exception as e:
         return 0, 'error: ' + str(e)[:120]
 
-def build_whatsapp(shortlist, scan_date, total):
-    lines = [
-        'Job Shortlist - ' + scan_date,
-        str(len(shortlist)) + ' matches from ' + str(total) + ' real listings',
-        ''
-    ]
-    for i, job in enumerate(shortlist[:10], 1):
-        loc = 'Remote' if job.get('remote_ok') else str(job.get('location_raw','?'))
-        sql = ' | SQL:Required' if job.get('sql_required') else (' | SQL:Mentioned' if job.get('sql_mentioned') else '')
-        lines.append(str(i) + '. ' + str(job['match_score']) + '/5 - ' + job['role_title'] + ' @ ' + job['company_name'])
-        lines.append('   ' + loc + ' | ' + str(job.get('company_stage','?')) + sql)
-        lines.append('   ' + str(job.get('reason','')))
-        lines.append('   ' + str(job.get('apply_url','')))
-        lines.append('')
-    lines.append("Reply 'tailor N' to draft resume for that role.")
-    return chr(10).join(lines)
-
 if __name__ == '__main__':
     api_key = get_deepseek_key()
     print('PP Job Matcher')
@@ -191,10 +174,3 @@ if __name__ == '__main__':
     }
     json.dump(shortlist, open(WORKSPACE + '/shortlist.json', 'w'), indent=2)
     print('Written to ' + WORKSPACE + '/shortlist.json')
-
-    msg = build_whatsapp(scored, scan_date, len(jobs))
-    open(WORKSPACE + '/whatsapp_message.txt', 'w').write(msg)
-    print('')
-    print('--- WHATSAPP MESSAGE ---')
-    print(msg[:1500])
-    print('--- END ---')
