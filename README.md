@@ -89,8 +89,6 @@ At time of publishing, the production scraper (`getro_scraper.py`) covered six V
 | Greylock | 71 |
 | **Total** | **~1,990** |
 
-Getting to a working scraper required reverse-engineering Getro's API across two underlying platform versions — Accel and General Catalyst run on an older page-paginated API at `api.getro.com`, while Lightspeed, Sequoia, Kleiner Perkins, and Greylock run on a newer cursor-paginated API at the board domain itself. Network IDs and request signatures had to be discovered through a mix of `__NEXT_DATA__` inspection and Playwright XHR capture. The repo contains the discovery scripts (`getro_discover_deep.py`, `getro_capture_xhr.py`, `getro_api_test.py`, `getro_api_direct.py`) that were used to figure this out, alongside the final production scraper.
-
 VC portfolio scraping is one approach to sourcing breadth, not the only one. Operator networks, accelerator job boards (YC Work at a Startup), and curated communities (Pavilion, Revenue Collective) cover meaningful overlap and gap. Users serious about sourcing should layer multiple approaches.
 
 ---
@@ -237,10 +235,6 @@ job-application-assistant/
 │   ├── generate_pdf.py                    ← WeasyPrint PDF generator
 │   │
 │   ├── getro_scraper.py                   ← Production VC portfolio scraper (CSV output, --all/--vc modes)
-│   ├── getro_discover_deep.py             ← Network ID discovery via __NEXT_DATA__
-│   ├── getro_capture_xhr.py               ← Playwright XHR capture for newer Getro boards
-│   ├── getro_api_test.py                  ← URL-pattern hypothesis testing
-│   ├── getro_api_direct.py                ← Direct API client used during reverse-engineering
 │   │
 │   ├── bulk_add_companies.py              ← Resumable bulk import from a .txt list
 │   ├── ats_scout_getro_bulk_add.py        ← Same flow for Getro VC scrape output
