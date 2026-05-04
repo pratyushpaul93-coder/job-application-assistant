@@ -139,7 +139,7 @@ Most job-search bots use Playwright or scrape rendered HTML. Both are brittle an
 
 Every job is captured with its real posting date, so the dashboard can color-code freshness (green <14 days, amber 15–30, red 30+) and de-prioritize stale listings.
 
-Scout reads its company registry from SQLite (`companies` joined to `ats_endpoints`) and writes matches directly to `job_postings` as it scans, with one `scan_runs` row recorded at the end. `workspace/raw_jobs.json` is also written on every run as a backup-only artifact — nothing in the live pipeline reads it. The legacy hardcoded `COMPANIES` list remains in `ats_scout.py` only as a last-resort fallback if the DB is unreachable; you can force that path with `PP_JOBAPP_COMPANY_SOURCE=legacy`.
+Scout reads its company registry from SQLite (`companies` joined to `ats_endpoints`) and writes matches directly to `job_postings` as it scans, with one `scan_runs` row recorded at the end. `workspace/raw_jobs.json` is also written on every run as a backup-only artifact — nothing in the live pipeline reads it. A hardcoded `COMPANIES` list in `ats_scout.py` remains as a fallback for when the DB is unreachable (slated for removal — see [BACKLOG.md item 14](./BACKLOG.md)).
 
 Title and JD pattern filters live in `scripts/scout_config.json` and run before any DB write, so the Matcher's scoring volume stays manageable and filters can be tuned without touching code.
 
@@ -183,10 +183,9 @@ The dashboard is fully SQLite-native: jobs come from `job_postings`,
 shortlist scores from `job_scores`, and comments / selected / reviewed /
 applied / manual fit scores / tailored resume mappings are stored against
 stable DB job IDs. URL aliases (`job_url_aliases`) resolve historical
-`job_url` / `apply_url` variants to the same posting. Legacy JSON
-fallback paths have been removed — when the DB is missing, every endpoint
-returns `HTTP 500` with a clear pointer to `migrate_to_db.py`, so stale-data
-bugs surface loudly instead of silently.
+`job_url` / `apply_url` variants to the same posting. When the DB is
+missing, every endpoint returns `HTTP 500` with a clear pointer to
+`migrate_to_db.py`, so stale-data bugs surface loudly.
 
 **Features:**
 
@@ -395,14 +394,11 @@ See `docs/data-contracts.md` for the live data contracts and failure modes,
 
 `workspace/raw_jobs.json` and `workspace/shortlist.json` are written on
 every Scout / Matcher run as backup-only artifacts (the JSON files carry
-a `_note` field marking them as such). The legacy dashboard state files
-(`feedback.json`, `selected.json`, `job_status.json`,
-`tailored_resumes.json`) have been moved to
-`workspace/archive/json_legacy/` as a frozen pre-migration snapshot.
+a `_note` field marking them as such). Pre-migration JSON state files
+are archived under `workspace/archive/json_legacy/` — see
+[CHANGELOG.md](./CHANGELOG.md) for migration context.
 
-Scout reads its company list from SQLite. The legacy hardcoded list in
-`ats_scout.py` is a last-resort fallback for when the DB is unreachable.
-To force that path during debugging:
+To force the hardcoded `COMPANIES` fallback during debugging:
 
 ```bash
 PP_JOBAPP_COMPANY_SOURCE=legacy python3 scripts/ats_scout.py

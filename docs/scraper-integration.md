@@ -124,9 +124,11 @@ Write to:
 - `job_interactions`
   - use `storage.update_job_interaction(...)`
 
-Dashboard reads and writes SQLite when `workspace/jobapp.db` is available and
-falls back to legacy JSON only if the DB is unavailable. Matcher scripts read
-manual feedback from SQLite first and save current scores back to `job_scores`.
+Dashboard reads and writes SQLite directly. When `workspace/jobapp.db` is
+missing the dashboard fails loudly (HTTP 500 with a pointer to
+`migrate_to_db.py`); the legacy JSON fallback was removed in commit
+`86e04d3`. Matcher scripts read manual feedback from SQLite first and save
+current scores back to `job_scores`.
 
 ## Recommended Scraper Pattern
 

@@ -4,6 +4,9 @@ Single source of truth for engineering work. Priorities re-ranked 2026-05-04.
 
 Tiers reflect urgency, not effort. "Do soon" doesn't mean small.
 
+> For backward-looking history (refactors, migrations, data operations),
+> see [CHANGELOG.md](./CHANGELOG.md).
+
 ---
 
 ## Tier 1 — Critical (next 2 weeks)
@@ -109,35 +112,3 @@ SQLite-backed paths are now default. Remove the in-script `COMPANIES`
 list and `PP_JOBAPP_COMPANY_SOURCE=legacy` escape hatch from
 `ats_scout.py` during the next session that touches it.
 
----
-
-## Operational log
-
-Most recent first. `git log` is the canonical change record; entries here
-are narrative summaries of material shipped work.
-
-### 2026-05-04 — ATS detection refactor + reactivation + backfill
-- Extracted `detect_ats()` from dashboard.py to storage.py as pure function
-- Added `discover_phase()` to ats_scout.py (auto-discovery on DB)
-- Improved detection logic: ~60 candidate slugs, website probing,
-  12 provider signatures, DNS pre-flight, URL-decoding tolerance
-- Bulk scripts now call storage.detect_ats() directly (removed
-  localhost:5000 HTTP coupling)
-- Reactivated 2,402 companies that had been bulk-deactivated by old
-  detection failures (none were dashboard_manual deletions)
-- Launched backfill against 2,402 eligible companies in tmux session
-
-Commits: 88aeb7d, eae0863, 0a0db14, 6738d32, 791a97b, fe548d8, 48120cf
-
-### 2026-05-04 — SQLite Phase 5: dashboard + matcher DB-native
-
-- Dashboard `/api/data` and company scan stats now read from SQLite
-  (`job_postings` + `job_scores`) instead of `raw_jobs.json`.
-- Matchers load jobs from SQLite, write scores to `job_scores` under
-  `scorer='current_shortlist'`. `shortlist.json` becomes backup/debug only.
-- Dashboard scan order: Scout → migrate/import to DB → Matcher, so the
-  Matcher sees fresh scanned jobs through SQLite.
-- `raw_jobs.json` and `shortlist.json` retained as backup exports, not
-  read in normal operation.
-
-Commits (approx): 9459a02, 791d71b, e90dfc8, 86e04d3, 46948c1, e94a66d
