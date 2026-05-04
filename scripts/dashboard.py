@@ -417,36 +417,21 @@ def download_pdf():
 
 @app.route("/api/add_company/detect", methods=["POST"])
 def add_company_detect():
-    import urllib.request as _ur, json as _json, re as _re
     d = request.json or {}
     name = d.get("name", "").strip()
     if not name:
         return jsonify({"error": "company name required"}), 400
-    base = _re.sub(r"[^a-z0-9]", "", name.lower())
-    base_hyphen = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    candidates = list(dict.fromkeys([base, base_hyphen, base + "hq", "get" + base, base + "-ai", base + "so"]))
-    def _get(url):
-        try:
-            req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with _ur.urlopen(req, timeout=8) as r:
-                return _json.loads(r.read().decode())
-        except:
-            return None
-    for slug in candidates:
-        data = _get(f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=false")
-        if data and data.get("jobs"):
-            jobs = data["jobs"]
-            return jsonify({"found": True, "ats": "ashby", "slug": slug, "total_jobs": len(jobs), "sample_titles": [j.get("title","") for j in jobs[:5]]})
-    for slug in candidates:
-        data = _get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs")
-        if data and data.get("jobs"):
-            jobs = data["jobs"]
-            return jsonify({"found": True, "ats": "greenhouse", "slug": slug, "total_jobs": len(jobs), "sample_titles": [j.get("title","") for j in jobs[:5]]})
-    for slug in candidates:
-        data = _get(f"https://api.lever.co/v0/postings/{slug}")
-        if isinstance(data, list) and data:
-            return jsonify({"found": True, "ats": "lever", "slug": slug, "total_jobs": len(data), "sample_titles": [j.get("text","") for j in data[:5]]})
-    return jsonify({"found": False, "tried_slugs": candidates})
+    website_url = d.get("website_url")
+    result = storage.detect_ats(name, website_url)
+    if result:
+        return jsonify({
+            "found": True,
+            "ats": result["provider"],
+            "slug": result["slug"],
+            "total_jobs": result["total_jobs"],
+            "sample_titles": result["sample_titles"],
+        })
+    return jsonify({"found": False, "tried_slugs": []})
 
 
 @app.route("/api/add_company/confirm", methods=["POST"])
@@ -457,6 +442,7 @@ def add_company_confirm():
     slug     = d.get("slug", "").strip()
     stage    = d.get("stage", "Unknown").strip()
     vertical = d.get("vertical", "SaaS").strip()
+    open_jobs_actual = d.get("open_jobs_actual")
     if not all([name, ats, slug]):
         return jsonify({"error": "name, ats, slug required"}), 400
     conn = _db_conn()
@@ -473,6 +459,7 @@ def add_company_confirm():
             slug=slug,
             stage=stage,
             vertical=vertical,
+            open_jobs_actual=open_jobs_actual,
         )
     finally:
         conn.close()

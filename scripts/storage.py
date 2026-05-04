@@ -312,6 +312,81 @@ def get_ats_endpoint(conn: sqlite3.Connection, provider: str, slug: str) -> sqli
     ).fetchone()
 
 
+def _http_get_json(url: str, timeout: int = 8) -> Any:
+    """Pure HTTP helper: GET a URL, return parsed JSON or None on any failure."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode())
+    except Exception:
+        return None
+
+
+def detect_ats(name: str, website_url: str | None = None) -> dict | None:
+    """Probe public ATS APIs to discover whether a company has a public job board.
+
+    Returns a dict on hit:
+        {
+            "provider": "ashby" | "greenhouse" | "lever",
+            "slug": "...",
+            "total_jobs": int,
+            "sample_titles": [str, ...up to 5],
+            "tried_slugs": [...],
+        }
+    Returns None on miss.
+
+    Pure function: no DB access, no Flask. Side effects: HTTP requests only.
+    The website_url parameter is accepted but not yet used (reserved for
+    upcoming improvements that derive candidates from the company URL).
+    """
+    name = (name or "").strip()
+    if not name:
+        return None
+    base = re.sub(r"[^a-z0-9]", "", name.lower())
+    base_hyphen = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    candidates = list(dict.fromkeys(
+        [base, base_hyphen, base + "hq", "get" + base, base + "-ai", base + "so"]
+    ))
+    for slug in candidates:
+        data = _http_get_json(
+            f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=false"
+        )
+        if data and data.get("jobs"):
+            jobs = data["jobs"]
+            return {
+                "provider": "ashby",
+                "slug": slug,
+                "total_jobs": len(jobs),
+                "sample_titles": [j.get("title", "") for j in jobs[:5]],
+                "tried_slugs": candidates,
+            }
+    for slug in candidates:
+        data = _http_get_json(
+            f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
+        )
+        if data and data.get("jobs"):
+            jobs = data["jobs"]
+            return {
+                "provider": "greenhouse",
+                "slug": slug,
+                "total_jobs": len(jobs),
+                "sample_titles": [j.get("title", "") for j in jobs[:5]],
+                "tried_slugs": candidates,
+            }
+    for slug in candidates:
+        data = _http_get_json(f"https://api.lever.co/v0/postings/{slug}")
+        if isinstance(data, list) and data:
+            return {
+                "provider": "lever",
+                "slug": slug,
+                "total_jobs": len(data),
+                "sample_titles": [j.get("text", "") for j in data[:5]],
+                "tried_slugs": candidates,
+            }
+    return None
+
+
 def add_scan_run(
     conn: sqlite3.Connection,
     *,

@@ -912,7 +912,7 @@ async function detectCompany(){
     card.style.display='block';
     if(d.found){
       card.className='detect-card';
-      acDetected={ats:d.ats,slug:d.slug};
+      acDetected={ats:d.ats,slug:d.slug,total_jobs:d.total_jobs};
       document.getElementById('ac-card-title').textContent='Found on '+d.ats.charAt(0).toUpperCase()+d.ats.slice(1)+' — slug: '+d.slug;
       document.getElementById('ac-card-meta').textContent=d.total_jobs+' total jobs on their board';
       var jh='<strong style="font-size:11px;color:#555">Sample roles:</strong>';
@@ -949,7 +949,8 @@ async function confirmAddCompany(){
   var btn=document.getElementById('ac-confirm-btn');
   btn.disabled=true;btn.textContent='Adding...';
   try{
-    var r=await fetch('/api/add_company/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,ats:ats,slug:slug,stage:stage,vertical:vertical})});
+    var openJobs=acDetected&&typeof acDetected.total_jobs==='number'?acDetected.total_jobs:null;
+    var r=await fetch('/api/add_company/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,ats:ats,slug:slug,stage:stage,vertical:vertical,open_jobs_actual:openJobs})});
     var d=await r.json();
     btn.disabled=false;btn.textContent='Add to Scout';
     if(d.ok){
