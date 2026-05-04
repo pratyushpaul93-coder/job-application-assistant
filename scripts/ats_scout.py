@@ -1051,6 +1051,20 @@ all_jobs = []
 errors = []
 company_stats = []
 
+# ============================================================
+# DB connection for direct writes. job_postings is the source of
+# truth; raw_jobs.json is written below as a backup-only artifact.
+# ============================================================
+db_conn = None
+db_jobs_written = 0
+if os.path.exists(DB_PATH):
+    sys.path.insert(0, SCRIPTS)
+    import storage  # noqa: E402
+    db_conn = storage.connect(DB_PATH)
+    print("DB writes: ENABLED (" + DB_PATH + ")")
+else:
+    print("DB writes: DISABLED (no DB at " + DB_PATH + ")")
+
 for company in SCAN_COMPANIES:
     ats = company['ats']
     try:
@@ -1068,6 +1082,19 @@ for company in SCAN_COMPANIES:
             print("  " + company['name'] + " (" + ats + "): " + str(len(matches)) + " matches / " + str(total) + " total")
         all_jobs.extend(matches)
         company_stats.append({'company': company['name'], 'ats': ats, 'total_jobs': total, 'matches': len(matches), 'status': status})
+
+        # Direct DB write — happens per company so partial failures don't lose data.
+        if db_conn is not None and matches:
+            endpoint = storage.get_ats_endpoint(db_conn, ats, company['slug'])
+            if endpoint is None:
+                print("  WARN: no ats_endpoints row for " + company['name'] + " (" + ats + "/" + company['slug'] + "); skipping DB write")
+            else:
+                company_id = endpoint['company_id']
+                endpoint_id = endpoint['id']
+                for j in matches:
+                    storage.upsert_job_posting(db_conn, j, company_id=company_id, ats_endpoint_id=endpoint_id)
+                    db_jobs_written += 1
+                db_conn.commit()
     except Exception as e:
         errors.append(company['name'] + ": " + str(e))
         print("  " + company['name'] + ": ERROR - " + str(e))
@@ -1101,17 +1128,44 @@ if all_jobs:
     sample = all_jobs[0]
     print("Sample posting date: " + str(sample.get('posted_date', 'N/A')) + " (" + str(sample.get('days_ago', '?')) + " days ago)")
 
+scan_date = str(datetime.date.today())
+scan_method = 'ats_api_direct_v2'
+config_version = CONFIG.get('_version', 'unknown')
+
+# ============================================================
+# Record scan_run in DB (canonical) + write raw_jobs.json (backup).
+# ============================================================
+if db_conn is not None:
+    try:
+        storage.add_scan_run(
+            db_conn,
+            scan_date=scan_date,
+            scan_method=scan_method,
+            config_version=str(config_version),
+            total_companies_scanned=len(SCAN_COMPANIES),
+            total_matches=len(all_jobs),
+            raw_metadata={
+                'company_stats': company_stats,
+                'errors': errors,
+            },
+        )
+        db_conn.commit()
+    finally:
+        db_conn.close()
+    print("DB writes: " + str(db_jobs_written) + " job_postings upserted, scan_run recorded")
+
 output = {
-    'scan_date': str(datetime.date.today()),
-    'scan_method': 'ats_api_direct_v2',
-    'config_version': CONFIG.get('_version', 'unknown'),
+    'scan_date': scan_date,
+    'scan_method': scan_method,
+    'config_version': config_version,
     'total_companies_scanned': len(SCAN_COMPANIES),
     'total_matches': len(all_jobs),
     'company_stats': company_stats,
     'jobs': all_jobs,
     'errors': errors,
+    '_note': 'Backup artifact only. job_postings table is canonical.',
 }
 os.makedirs(WORKSPACE, exist_ok=True)
 with open(WORKSPACE + '/raw_jobs.json', 'w') as f:
     json.dump(output, f, indent=2)
-print("Written to " + WORKSPACE + "/raw_jobs.json")
+print("Backup written: " + WORKSPACE + "/raw_jobs.json")

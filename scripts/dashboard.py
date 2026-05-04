@@ -240,8 +240,8 @@ def scan():
     status_path = os.path.join(WORKSPACE, "scan_status.json")
     json.dump({"status": "running", "started": str(dt.datetime.now())}, open(status_path, "w"))
     def run():
+        # Scout writes job_postings directly; no migrate_to_db step needed.
         subprocess.run(["python3", "/root/pp-jobapp/scripts/ats_scout.py"])
-        subprocess.run(["python3", "/root/pp-jobapp/scripts/migrate_to_db.py"])
         subprocess.run(["python3", "/root/pp-jobapp/scripts/ats_matcher.py"])
         import datetime as dt2
         json.dump({"status": "done", "finished": str(dt2.datetime.now())}, open(status_path, "w"))

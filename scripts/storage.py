@@ -312,6 +312,36 @@ def get_ats_endpoint(conn: sqlite3.Connection, provider: str, slug: str) -> sqli
     ).fetchone()
 
 
+def add_scan_run(
+    conn: sqlite3.Connection,
+    *,
+    scan_date: str,
+    scan_method: str,
+    config_version: str,
+    total_companies_scanned: int,
+    total_matches: int,
+    raw_metadata: dict[str, Any] | None = None,
+) -> int:
+    """Record a scout run. Returns the new scan_runs.id."""
+    cur = conn.execute(
+        """
+        INSERT INTO scan_runs
+            (scan_date, scan_method, config_version,
+             total_companies_scanned, total_matches, raw_metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            scan_date,
+            scan_method,
+            config_version,
+            total_companies_scanned,
+            total_matches,
+            json_dumps(raw_metadata or {}),
+        ),
+    )
+    return int(cur.lastrowid)
+
+
 def add_dashboard_company(
     conn: sqlite3.Connection,
     *,
