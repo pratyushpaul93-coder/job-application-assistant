@@ -78,13 +78,16 @@ def _resume_filename(company, role, ext=".pdf"):
     return f"PPaul_{date_str}_{company_s}_{role_s}{ext}"
 
 def _lookup_resume_meta(txt_filename):
-    """Look up company_name and role_title from tailored_resumes.json for a given .txt filename."""
-    p = os.path.join(WORKSPACE, "tailored_resumes.json")
-    if not os.path.exists(p):
+    """Look up company_name and role_title for a given .txt filename from the DB."""
+    conn = _db_conn()
+    if not conn:
         return None, None
-    for entry in json.load(open(p)):
-        if entry.get("tailored_file") == txt_filename:
-            return entry.get("company_name", ""), entry.get("role_title", "")
+    try:
+        for entry in storage.export_tailored_resumes(conn):
+            if entry.get("tailored_file") == txt_filename:
+                return entry.get("company_name", ""), entry.get("role_title", "")
+    finally:
+        conn.close()
     return None, None
 
 def _tailored_path(filename, allowed_exts=None):
@@ -103,44 +106,30 @@ def _tailored_path(filename, allowed_exts=None):
         return None
     return resolved
 
-def _load_json_file(filename, default):
-    path = os.path.join(WORKSPACE, filename)
-    return json.load(open(path)) if os.path.exists(path) else default
-
-def _write_json_file(filename, data):
-    path = os.path.join(WORKSPACE, filename)
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, path)
-
 def _db_conn():
     if not os.path.exists(DB_PATH):
         return None
     return storage.connect(DB_PATH)
 
-def _db_state():
-    conn = _db_conn()
-    if not conn:
-        return {}
-    try:
-        return storage.export_dashboard_state(conn)
-    finally:
-        conn.close()
 
-def _db_tailored_resumes():
-    conn = _db_conn()
-    if not conn:
-        return []
-    try:
-        return storage.export_tailored_resumes(conn)
-    finally:
-        conn.close()
+def _require_db():
+    """Open a DB connection or abort the request with HTTP 500.
 
-def _merge_dict(base, overlay):
-    out = dict(base or {})
-    out.update(overlay or {})
-    return out
+    The dashboard is SQLite-native; legacy JSON fallback has been removed.
+    Routes use this so the failure mode is visible (500 + clear message)
+    rather than silent stale-JSON reads.
+    """
+    conn = _db_conn()
+    if conn is None:
+        from flask import abort
+        abort(
+            500,
+            description=(
+                f"SQLite DB required at {DB_PATH}. "
+                "Run: python3 scripts/migrate_to_db.py --reset"
+            ),
+        )
+    return conn
 
 @app.route('/')
 def index():
@@ -148,69 +137,39 @@ def index():
 
 @app.route('/api/data')
 def data():
-    conn = _db_conn()
-    if conn:
-        try:
-            payload = storage.export_dashboard_payload(conn)
-        finally:
-            conn.close()
-        for j in payload.get('jobs', []):
-            vc = _lookup_vc(j.get('company_name', ''))
-            if vc:
-                j['vc'] = vc
-        return jsonify(payload)
-
-    shortlist = _load_json_file('shortlist.json', {})
-    jobs = shortlist.get('jobs', [])
-    for j in jobs:
+    conn = _require_db()
+    try:
+        payload = storage.export_dashboard_payload(conn)
+    finally:
+        conn.close()
+    for j in payload.get('jobs', []):
         vc = _lookup_vc(j.get('company_name', ''))
         if vc:
             j['vc'] = vc
-    return jsonify({
-        'jobs': jobs,
-        'scan_date': shortlist.get('shortlist_date', 'unknown'),
-        'companies': 25,
-        'total_scanned': shortlist.get('total_scanned', 0),
-        'total_shortlisted': shortlist.get('total_shortlisted', 0),
-        'comments': _load_json_file('comments.json', {}),
-        'selected': _load_json_file('selected.json', []),
-        'job_status': _load_json_file('job_status.json', {}),
-        'feedback': _load_json_file('feedback.json', {}),
-    })
+    return jsonify(payload)
 
 @app.route('/api/comment', methods=['POST'])
 def comment():
     d = request.json
     key = d['key']
-    text = d.get('text','')
-    tags = d.get('tags',[])
-    conn = _db_conn()
-    if conn:
-        try:
-            storage.update_job_interaction(conn, key, comment=text, tags=tags)
-        finally:
-            conn.close()
-    else:
-        c = _load_json_file('comments.json', {})
-        c[key] = {'text': text, 'tags': tags, 'updated': datetime.now().isoformat()}
-        _write_json_file('comments.json', c)
+    text = d.get('text', '')
+    tags = d.get('tags', [])
+    conn = _require_db()
+    try:
+        storage.update_job_interaction(conn, key, comment=text, tags=tags)
+    finally:
+        conn.close()
     return jsonify({'ok': True})
 
 @app.route('/api/select', methods=['POST'])
 def select():
     d = request.json
     k = d['key']
-    conn = _db_conn()
-    if conn:
-        try:
-            storage.update_job_interaction(conn, k, selected=bool(d.get('selected')))
-        finally:
-            conn.close()
-    else:
-        sel = _load_json_file('selected.json', [])
-        if d.get('selected') and k not in sel: sel.append(k)
-        elif not d.get('selected') and k in sel: sel.remove(k)
-        _write_json_file('selected.json', sel)
+    conn = _require_db()
+    try:
+        storage.update_job_interaction(conn, k, selected=bool(d.get('selected')))
+    finally:
+        conn.close()
     return jsonify({'ok': True})
 
 @app.route("/api/feedback", methods=["POST"])
@@ -230,45 +189,32 @@ def feedback():
             return jsonify({"error": "manual_score must be 1-5"}), 400
     else:
         score = None
-    prior = {}
-    legacy_fb = _load_json_file("feedback.json", {})
-    prior = legacy_fb.get(key, {})
-    if score is None and not comment:
-        action = "deleted"
-    else:
-        entry = {
-            "manual_score": score,
-            "comment": comment,
-            "updated": datetime.now().isoformat(),
-        }
-        if d.get("role_title"):
-            entry["role_title"] = str(d["role_title"])[:200]
-        if d.get("company_name"):
-            entry["company_name"] = str(d["company_name"])[:120]
-        action = "saved"
-    conn = _db_conn()
-    if conn:
-        try:
-            storage.update_job_interaction(
-                conn,
-                key,
-                manual_score=score,
-                manual_score_comment=comment,
-                clear_manual_score=(score is None),
-            )
-        finally:
-            conn.close()
-    else:
-        fb = legacy_fb
-        if action == "deleted":
-            fb.pop(key, None)
-        else:
-            fb[key] = entry
-        _write_json_file("feedback.json", fb)
+    action = "deleted" if (score is None and not comment) else "saved"
+
+    conn = _require_db()
+    try:
+        prior_score = None
+        job_id = storage.job_id_for_url(conn, key)
+        if job_id is not None:
+            row = conn.execute(
+                "SELECT manual_score FROM job_interactions WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
+            if row is not None:
+                prior_score = row["manual_score"]
+        storage.update_job_interaction(
+            conn,
+            key,
+            manual_score=score,
+            manual_score_comment=comment,
+            clear_manual_score=(score is None),
+        )
+    finally:
+        conn.close()
     return jsonify({
         "ok": True,
         "action": action,
-        "prior_score": prior.get("manual_score"),
+        "prior_score": prior_score,
         "current_score": score,
     })
 
@@ -281,18 +227,11 @@ def job_status():
     value = d.get("value", False)
     if not key or field not in ("reviewed", "applied"):
         return jsonify({"error": "key and field (reviewed|applied) required"}), 400
-    conn = _db_conn()
-    if conn:
-        try:
-            kwargs = {field: bool(value)}
-            storage.update_job_interaction(conn, key, **kwargs)
-        finally:
-            conn.close()
-    else:
-        statuses = _load_json_file("job_status.json", {})
-        statuses.setdefault(key, {})
-        statuses[key][field] = value
-        _write_json_file("job_status.json", statuses)
+    conn = _require_db()
+    try:
+        storage.update_job_interaction(conn, key, **{field: bool(value)})
+    finally:
+        conn.close()
     return jsonify({"ok": True})
 
 @app.route("/api/scan", methods=["POST"])
@@ -332,14 +271,13 @@ def tailor_status():
 
 @app.route("/api/tailored_resumes")
 def tailored_resumes():
-    data = _db_tailored_resumes()
-    if not data:
-        p = os.path.join(WORKSPACE, "tailored_resumes.json")
-        if not os.path.exists(p):
-            return jsonify([])
-        data = json.load(open(p))
+    conn = _require_db()
+    try:
+        data = storage.export_tailored_resumes(conn)
+    finally:
+        conn.close()
     for item in data:
-        if item.get("job_url","").endswith("/application"):
+        if item.get("job_url", "").endswith("/application"):
             item["job_url"] = item["job_url"][:-len("/application")]
     return jsonify(data)
 
