@@ -22,7 +22,24 @@ dashboard.log
 *.json
 *.csv
 *.tar.gz
+*.db
+*.db-*
+*.pdf
+*.html
 
 # Project-specific
 career-ops/
 workspace/
+resumes/master_resume.txt
+resumes/resume_library.txt
+resumes/tailored/
+
+# OpenClaw agent identity files (local-only, do not publish)
+AGENTS.md
+HEARTBEAT.md
+IDENTITY.md
+memory/
+SOUL.md
+TOOLS.md
+USER.md
+CAREER_OPS_LEARNINGS.md

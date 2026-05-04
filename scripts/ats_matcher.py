@@ -1,8 +1,16 @@
-import json, urllib.request, os, datetime
+import json, urllib.request, os, datetime, sys
 
 WORKSPACE   = '/root/pp-jobapp/workspace'
+SCRIPTS     = '/root/pp-jobapp/scripts'
 CONFIG_PATH = '/root/pp-jobapp/scripts/scout_config.json'
 FEEDBACK    = WORKSPACE + '/feedback.json'
+DB_PATH     = WORKSPACE + '/jobapp.db'
+SCORER      = 'current_shortlist'
+
+def _storage():
+    sys.path.insert(0, SCRIPTS)
+    import storage
+    return storage
 
 def get_deepseek_key():
     try:
@@ -20,12 +28,44 @@ def _load_feedback_settings():
         return True, 8
 
 def _load_feedback():
+    if os.path.exists(DB_PATH):
+        try:
+            storage = _storage()
+            conn = storage.connect(DB_PATH)
+            try:
+                fb = storage.load_feedback_examples(conn)
+            finally:
+                conn.close()
+            if fb:
+                return fb
+        except Exception as e:
+            print('WARN: SQLite feedback load failed: ' + str(e)[:120] + '; falling back to feedback.json')
     if not os.path.exists(FEEDBACK):
         return {}
     try:
         return json.load(open(FEEDBACK))
     except Exception:
         return {}
+
+def _load_jobs():
+    if os.path.exists(DB_PATH):
+        storage = _storage()
+        conn = storage.connect(DB_PATH)
+        try:
+            return storage.load_jobs_for_matching(conn), 'SQLite job_postings'
+        finally:
+            conn.close()
+    raw = json.load(open(WORKSPACE + '/raw_jobs.json'))
+    return raw.get('jobs', []), WORKSPACE + '/raw_jobs.json'
+
+def _save_scores(scored):
+    if os.path.exists(DB_PATH):
+        storage = _storage()
+        conn = storage.connect(DB_PATH)
+        try:
+            storage.save_job_scores(conn, scored, scorer=SCORER)
+        finally:
+            conn.close()
 
 def select_few_shot_examples(max_n=8):
     """Return a list of formatted few-shot example strings.
@@ -147,24 +187,27 @@ if __name__ == '__main__':
     else:
         print('Feedback loop: ' + ('enabled but no feedback yet' if fb_enabled else 'DISABLED via config'))
 
-    raw = json.load(open(WORKSPACE + '/raw_jobs.json'))
-    jobs = raw.get('jobs', [])
-    scan_date = raw.get('scan_date', str(datetime.date.today()))
-    print('Loaded ' + str(len(jobs)) + ' jobs from ' + scan_date)
+    jobs, job_source = _load_jobs()
+    print('Loaded ' + str(len(jobs)) + ' jobs from ' + job_source)
     print('-' * 50)
 
     scored = []
+    scored_all = []
     for job in jobs:
         score, reason = score_job(job, api_key, few_shot_block)
+        job['match_score'] = score
+        job['reason'] = reason
+        scored_all.append(job)
         if score >= 3:
-            job['match_score'] = score
-            job['reason'] = reason
             scored.append(job)
             print('  ' + str(score) + '/5 - ' + job['role_title'] + ' @ ' + job['company_name'])
 
     scored.sort(key=lambda x: x['match_score'], reverse=True)
     print('-' * 50)
     print('Shortlisted: ' + str(len(scored)) + ' roles scoring 3+')
+    _save_scores(scored_all)
+    if os.path.exists(DB_PATH):
+        print('Written scores to SQLite job_scores as scorer=' + SCORER)
 
     shortlist = {
         'shortlist_date': str(datetime.date.today()),
@@ -173,4 +216,4 @@ if __name__ == '__main__':
         'jobs': scored
     }
     json.dump(shortlist, open(WORKSPACE + '/shortlist.json', 'w'), indent=2)
-    print('Written to ' + WORKSPACE + '/shortlist.json')
+    print('Exported backup to ' + WORKSPACE + '/shortlist.json')

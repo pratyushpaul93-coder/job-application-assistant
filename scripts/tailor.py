@@ -3,6 +3,8 @@ import json, os, sys, urllib.request, datetime
 WORKSPACE = "/root/pp-jobapp/workspace"
 RESUMES_DIR = "/root/pp-jobapp/resumes"
 OUTPUT_DIR = "/root/pp-jobapp/resumes/tailored"
+SCRIPTS_DIR = "/root/pp-jobapp/scripts"
+DB_PATH = WORKSPACE + "/jobapp.db"
 
 FRAMEWORK = """
 PP RESUME UPDATE FRAMEWORK:
@@ -56,6 +58,45 @@ def call_claude(prompt, api_key):
     with urllib.request.urlopen(req, timeout=60) as r:
         resp = json.loads(r.read().decode())
         return resp["content"][0]["text"]
+
+def record_tailored_resume(job_url, role_title, company_name, filename, date_str):
+    if os.path.exists(DB_PATH):
+        try:
+            sys.path.insert(0, SCRIPTS_DIR)
+            import storage
+            conn = storage.connect(DB_PATH)
+            try:
+                storage.add_resume_artifact(
+                    conn,
+                    job_url=job_url,
+                    role_title=role_title,
+                    company_name=company_name,
+                    filename_txt=filename,
+                    tailored_date=date_str,
+                    raw_metadata={
+                        "job_url": job_url,
+                        "role_title": role_title,
+                        "company_name": company_name,
+                        "tailored_file": filename,
+                        "tailored_date": date_str,
+                    },
+                )
+            finally:
+                conn.close()
+            return
+        except Exception as e:
+            print("WARN: SQLite tailored resume recording failed: " + str(e)[:120])
+
+    tracker_path = os.path.join(WORKSPACE, "tailored_resumes.json")
+    tracker = json.load(open(tracker_path)) if os.path.exists(tracker_path) else []
+    tracker.append({
+        "job_url": job_url,
+        "role_title": role_title,
+        "company_name": company_name,
+        "tailored_file": filename,
+        "tailored_date": date_str
+    })
+    json.dump(tracker, open(tracker_path, "w"), indent=2)
 
 def run(job_url, role_title, company_name):
     api_key = get_api_key()
@@ -125,16 +166,7 @@ def run(job_url, role_title, company_name):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     open(filepath, "w").write(tailored)
 
-    tracker_path = os.path.join(WORKSPACE, "tailored_resumes.json")
-    tracker = json.load(open(tracker_path)) if os.path.exists(tracker_path) else []
-    tracker.append({
-        "job_url": job_url,
-        "role_title": role_title,
-        "company_name": company_name,
-        "tailored_file": filename,
-        "tailored_date": date_str
-    })
-    json.dump(tracker, open(tracker_path, "w"), indent=2)
+    record_tailored_resume(job_url, role_title, company_name, filename, date_str)
 
     # Verify contact line has both LinkedIn and GitHub - inject if missing
     contact_line = "(312) 678-3629 | pratyushpaul93@gmail.com | linkedin.com/in/pratyushpaul | github.com/pratyushpaul93-coder"

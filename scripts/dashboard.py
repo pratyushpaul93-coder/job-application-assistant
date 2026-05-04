@@ -1,11 +1,15 @@
-import json, os, re, threading, subprocess, csv
+import json, os, re, threading, subprocess, csv, sys
 from datetime import datetime
 from flask import Flask, request, jsonify
+from werkzeug.utils import safe_join
 
 app = Flask(__name__)
 WORKSPACE = '/root/pp-jobapp/workspace'
 TAILORED_DIR = '/root/pp-jobapp/resumes/tailored'
 SCRIPTS_DIR = '/root/pp-jobapp/scripts'
+DB_PATH = os.path.join(WORKSPACE, 'jobapp.db')
+sys.path.insert(0, SCRIPTS_DIR)
+import storage
 
 _VC_LABELS = {
     'accel': 'Accel',
@@ -83,16 +87,80 @@ def _lookup_resume_meta(txt_filename):
             return entry.get("company_name", ""), entry.get("role_title", "")
     return None, None
 
+def _tailored_path(filename, allowed_exts=None):
+    """Resolve a user-provided tailored-resume filename inside TAILORED_DIR."""
+    filename = (filename or "").strip()
+    if not filename:
+        return None
+    if allowed_exts and not any(filename.endswith(ext) for ext in allowed_exts):
+        return None
+    path = safe_join(TAILORED_DIR, filename)
+    if not path:
+        return None
+    base = os.path.abspath(TAILORED_DIR)
+    resolved = os.path.abspath(path)
+    if os.path.commonpath([base, resolved]) != base:
+        return None
+    return resolved
+
+def _load_json_file(filename, default):
+    path = os.path.join(WORKSPACE, filename)
+    return json.load(open(path)) if os.path.exists(path) else default
+
+def _write_json_file(filename, data):
+    path = os.path.join(WORKSPACE, filename)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, path)
+
+def _db_conn():
+    if not os.path.exists(DB_PATH):
+        return None
+    return storage.connect(DB_PATH)
+
+def _db_state():
+    conn = _db_conn()
+    if not conn:
+        return {}
+    try:
+        return storage.export_dashboard_state(conn)
+    finally:
+        conn.close()
+
+def _db_tailored_resumes():
+    conn = _db_conn()
+    if not conn:
+        return []
+    try:
+        return storage.export_tailored_resumes(conn)
+    finally:
+        conn.close()
+
+def _merge_dict(base, overlay):
+    out = dict(base or {})
+    out.update(overlay or {})
+    return out
+
 @app.route('/')
 def index():
     return open('/root/pp-jobapp/scripts/dashboard_ui.html').read()
 
 @app.route('/api/data')
 def data():
-    def load(f, default):
-        p = os.path.join(WORKSPACE, f)
-        return json.load(open(p)) if os.path.exists(p) else default
-    shortlist = load('shortlist.json', {})
+    conn = _db_conn()
+    if conn:
+        try:
+            payload = storage.export_dashboard_payload(conn)
+        finally:
+            conn.close()
+        for j in payload.get('jobs', []):
+            vc = _lookup_vc(j.get('company_name', ''))
+            if vc:
+                j['vc'] = vc
+        return jsonify(payload)
+
+    shortlist = _load_json_file('shortlist.json', {})
     jobs = shortlist.get('jobs', [])
     for j in jobs:
         vc = _lookup_vc(j.get('company_name', ''))
@@ -104,30 +172,45 @@ def data():
         'companies': 25,
         'total_scanned': shortlist.get('total_scanned', 0),
         'total_shortlisted': shortlist.get('total_shortlisted', 0),
-        'comments': load('comments.json', {}),
-        'selected': load('selected.json', []),
-        'job_status': load('job_status.json', {}),
-        'feedback': load('feedback.json', {}),
+        'comments': _load_json_file('comments.json', {}),
+        'selected': _load_json_file('selected.json', []),
+        'job_status': _load_json_file('job_status.json', {}),
+        'feedback': _load_json_file('feedback.json', {}),
     })
 
 @app.route('/api/comment', methods=['POST'])
 def comment():
     d = request.json
-    p = os.path.join(WORKSPACE, 'comments.json')
-    c = json.load(open(p)) if os.path.exists(p) else {}
-    c[d['key']] = {'text': d.get('text',''), 'tags': d.get('tags',[]), 'updated': datetime.now().isoformat()}
-    json.dump(c, open(p,'w'), indent=2)
+    key = d['key']
+    text = d.get('text','')
+    tags = d.get('tags',[])
+    conn = _db_conn()
+    if conn:
+        try:
+            storage.update_job_interaction(conn, key, comment=text, tags=tags)
+        finally:
+            conn.close()
+    else:
+        c = _load_json_file('comments.json', {})
+        c[key] = {'text': text, 'tags': tags, 'updated': datetime.now().isoformat()}
+        _write_json_file('comments.json', c)
     return jsonify({'ok': True})
 
 @app.route('/api/select', methods=['POST'])
 def select():
     d = request.json
-    p = os.path.join(WORKSPACE, 'selected.json')
-    sel = json.load(open(p)) if os.path.exists(p) else []
     k = d['key']
-    if d.get('selected') and k not in sel: sel.append(k)
-    elif not d.get('selected') and k in sel: sel.remove(k)
-    json.dump(sel, open(p,'w'), indent=2)
+    conn = _db_conn()
+    if conn:
+        try:
+            storage.update_job_interaction(conn, k, selected=bool(d.get('selected')))
+        finally:
+            conn.close()
+    else:
+        sel = _load_json_file('selected.json', [])
+        if d.get('selected') and k not in sel: sel.append(k)
+        elif not d.get('selected') and k in sel: sel.remove(k)
+        _write_json_file('selected.json', sel)
     return jsonify({'ok': True})
 
 @app.route("/api/feedback", methods=["POST"])
@@ -147,11 +230,10 @@ def feedback():
             return jsonify({"error": "manual_score must be 1-5"}), 400
     else:
         score = None
-    p = os.path.join(WORKSPACE, "feedback.json")
-    fb = json.load(open(p)) if os.path.exists(p) else {}
-    prior = fb.get(key, {})
+    prior = {}
+    legacy_fb = _load_json_file("feedback.json", {})
+    prior = legacy_fb.get(key, {})
     if score is None and not comment:
-        fb.pop(key, None)
         action = "deleted"
     else:
         entry = {
@@ -163,12 +245,26 @@ def feedback():
             entry["role_title"] = str(d["role_title"])[:200]
         if d.get("company_name"):
             entry["company_name"] = str(d["company_name"])[:120]
-        fb[key] = entry
         action = "saved"
-    tmp = p + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(fb, f, indent=2)
-    os.replace(tmp, p)
+    conn = _db_conn()
+    if conn:
+        try:
+            storage.update_job_interaction(
+                conn,
+                key,
+                manual_score=score,
+                manual_score_comment=comment,
+                clear_manual_score=(score is None),
+            )
+        finally:
+            conn.close()
+    else:
+        fb = legacy_fb
+        if action == "deleted":
+            fb.pop(key, None)
+        else:
+            fb[key] = entry
+        _write_json_file("feedback.json", fb)
     return jsonify({
         "ok": True,
         "action": action,
@@ -185,11 +281,18 @@ def job_status():
     value = d.get("value", False)
     if not key or field not in ("reviewed", "applied"):
         return jsonify({"error": "key and field (reviewed|applied) required"}), 400
-    p = os.path.join(WORKSPACE, "job_status.json")
-    statuses = json.load(open(p)) if os.path.exists(p) else {}
-    statuses.setdefault(key, {})
-    statuses[key][field] = value
-    json.dump(statuses, open(p, "w"), indent=2)
+    conn = _db_conn()
+    if conn:
+        try:
+            kwargs = {field: bool(value)}
+            storage.update_job_interaction(conn, key, **kwargs)
+        finally:
+            conn.close()
+    else:
+        statuses = _load_json_file("job_status.json", {})
+        statuses.setdefault(key, {})
+        statuses[key][field] = value
+        _write_json_file("job_status.json", statuses)
     return jsonify({"ok": True})
 
 @app.route("/api/scan", methods=["POST"])
@@ -199,6 +302,7 @@ def scan():
     json.dump({"status": "running", "started": str(dt.datetime.now())}, open(status_path, "w"))
     def run():
         subprocess.run(["python3", "/root/pp-jobapp/scripts/ats_scout.py"])
+        subprocess.run(["python3", "/root/pp-jobapp/scripts/migrate_to_db.py"])
         subprocess.run(["python3", "/root/pp-jobapp/scripts/ats_matcher.py"])
         import datetime as dt2
         json.dump({"status": "done", "finished": str(dt2.datetime.now())}, open(status_path, "w"))
@@ -228,10 +332,12 @@ def tailor_status():
 
 @app.route("/api/tailored_resumes")
 def tailored_resumes():
-    p = os.path.join(WORKSPACE, "tailored_resumes.json")
-    if not os.path.exists(p):
-        return jsonify([])
-    data = json.load(open(p))
+    data = _db_tailored_resumes()
+    if not data:
+        p = os.path.join(WORKSPACE, "tailored_resumes.json")
+        if not os.path.exists(p):
+            return jsonify([])
+        data = json.load(open(p))
     for item in data:
         if item.get("job_url","").endswith("/application"):
             item["job_url"] = item["job_url"][:-len("/application")]
@@ -245,7 +351,9 @@ def scan_status():
 @app.route("/api/tailored_resume_content")
 def tailored_resume_content():
     filename = request.args.get("file", "")
-    filepath = os.path.join("/root/pp-jobapp/resumes/tailored", filename)
+    filepath = _tailored_path(filename, {".txt"})
+    if not filepath:
+        return jsonify({"error": "invalid filename"}), 400
     if os.path.exists(filepath):
         return jsonify({"content": open(filepath).read()})
     return jsonify({"error": "not found"}), 404
@@ -258,7 +366,9 @@ def revise():
     d = request.json
     filename = d.get("filename", "")
     comments = d.get("comments", "")
-    filepath = os.path.join("/root/pp-jobapp/resumes/tailored", filename)
+    filepath = _tailored_path(filename, {".txt"})
+    if not filepath:
+        return jsonify({"error": "invalid filename"}), 400
     if not os.path.exists(filepath):
         return jsonify({"error": "file not found"}), 404
     current_content = open(filepath).read()
@@ -294,7 +404,9 @@ def generate_pdf_route():
     import subprocess as sp, shutil
     d = request.json
     filename = d.get("filename", "")
-    txt_path = os.path.join(TAILORED_DIR, filename)
+    txt_path = _tailored_path(filename, {".txt"})
+    if not txt_path:
+        return jsonify({"error": "invalid filename"}), 400
     if not os.path.exists(txt_path):
         return jsonify({"error": "txt file not found"}), 404
 
@@ -337,12 +449,16 @@ def download_pdf():
     if filename.endswith(".pdf"):
         pdf_name = filename
         txt_name = filename.replace(".pdf", ".txt")
-    else:
+    elif filename.endswith(".txt"):
         txt_name = filename
         pdf_name = filename.replace(".txt", ".pdf")
+    else:
+        return "Invalid filename", 400
 
-    txt_path = os.path.join(TAILORED_DIR, txt_name)
-    pdf_path = os.path.join(TAILORED_DIR, pdf_name)
+    txt_path = _tailored_path(txt_name, {".txt"})
+    pdf_path = _tailored_path(pdf_name, {".pdf"})
+    if not txt_path or not pdf_path:
+        return "Invalid filename", 400
 
     # Regenerate PDF from latest .txt before serving
     if os.path.exists(txt_path):
@@ -384,7 +500,7 @@ def add_company_detect():
             jobs = data["jobs"]
             return jsonify({"found": True, "ats": "ashby", "slug": slug, "total_jobs": len(jobs), "sample_titles": [j.get("title","") for j in jobs[:5]]})
     for slug in candidates:
-        data = _get(f"https://api.greenhouse.io/v1/boards/{slug}/jobs")
+        data = _get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs")
         if data and data.get("jobs"):
             jobs = data["jobs"]
             return jsonify({"found": True, "ats": "greenhouse", "slug": slug, "total_jobs": len(jobs), "sample_titles": [j.get("title","") for j in jobs[:5]]})
@@ -397,7 +513,6 @@ def add_company_detect():
 
 @app.route("/api/add_company/confirm", methods=["POST"])
 def add_company_confirm():
-    import re as _re
     d = request.json or {}
     name     = d.get("name", "").strip()
     ats      = d.get("ats", "").strip()
@@ -406,99 +521,63 @@ def add_company_confirm():
     vertical = d.get("vertical", "SaaS").strip()
     if not all([name, ats, slug]):
         return jsonify({"error": "name, ats, slug required"}), 400
-    scout_path = "/root/pp-jobapp/scripts/ats_scout.py"
-    content = open(scout_path).read()
-    if f"'slug': '{slug}'" in content:
-        return jsonify({"error": f"Slug '{slug}' already exists in COMPANIES"}), 409
-    pattern = _re.compile(r"(COMPANIES\s*=\s*\[.*?\])", _re.DOTALL)
-    m = pattern.search(content)
-    if not m:
-        return jsonify({"error": "Could not parse COMPANIES list"}), 500
-    new_entry = f"    {{'name': '{name}', 'ats': '{ats}', 'slug': '{slug}', 'stage': '{stage}', 'vertical': '{vertical}'}},\n"
-    old_block = m.group(1).rstrip()
-    if old_block.endswith("]"):
-        new_block = old_block[:-1].rstrip()
-        if not new_block.endswith(","):
-            new_block += ","
-        new_block += "\n" + new_entry + "]"
-    else:
-        return jsonify({"error": "Unexpected COMPANIES format"}), 500
-    new_content = content[:m.start(1)] + new_block + content[m.end(1):]
-    open(scout_path, "w").write(new_content)
-    return jsonify({"ok": True, "message": f"{name} ({ats}/{slug}) added to COMPANIES"})
+    conn = _db_conn()
+    if not conn:
+        return jsonify({"error": "SQLite DB not found; run scripts/migrate_to_db.py --reset"}), 500
+    try:
+        existing = storage.get_ats_endpoint(conn, ats, slug)
+        if existing and existing["status"] == "active":
+            return jsonify({"error": f"ATS endpoint '{ats}/{slug}' already exists"}), 409
+        storage.add_dashboard_company(
+            conn,
+            name=name,
+            provider=ats,
+            slug=slug,
+            stage=stage,
+            vertical=vertical,
+        )
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "message": f"{name} ({ats}/{slug}) added to SQLite company registry"})
 
 
 
 
 @app.route("/api/companies/delete", methods=["POST"])
 def delete_company():
-    import re as _re
     data = request.get_json(force=True)
     name = (data or {}).get("name", "").strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
 
-    # 1) Remove from COMPANIES list in ats_scout.py (text-level rewrite)
-    scout_path = "/root/pp-jobapp/scripts/ats_scout.py"
-    scout = open(scout_path).read()
-    pattern = _re.compile(r"COMPANIES\s*=\s*(\[.*?\])", _re.DOTALL)
-    m = pattern.search(scout)
-    if not m:
-        return jsonify({"error": "Could not parse COMPANIES in ats_scout.py"}), 500
+    conn = _db_conn()
+    if not conn:
+        return jsonify({"error": "SQLite DB not found; run scripts/migrate_to_db.py --reset"}), 500
     try:
-        entries = eval(m.group(1))
-    except Exception:
-        return jsonify({"error": "Failed to eval COMPANIES"}), 500
-    new_entries = [e for e in entries if e.get("name", "").lower() != name.lower()]
-    if len(new_entries) == len(entries):
+        removed = storage.deactivate_company_by_name(conn, name)
+    finally:
+        conn.close()
+    if not removed:
         return jsonify({"error": f"Company '{name}' not found"}), 404
-    new_block = "[\n" + ",\n".join("    " + repr(e) for e in new_entries) + "\n]"
-    new_content = scout[:m.start(1)] + new_block + scout[m.end(1):]
-    open(scout_path, "w").write(new_content)
-
-    # 2) Clean workspace JSON files
-    name_lower = name.lower()
-    for fname in ("shortlist.json", "raw_jobs.json"):
-        fpath = os.path.join(WORKSPACE, fname)
-        if not os.path.exists(fpath):
-            continue
-        with open(fpath) as f:
-            jdata = json.load(f)
-        if isinstance(jdata.get("jobs"), list):
-            jdata["jobs"] = [j for j in jdata["jobs"] if j.get("company_name", "").lower() != name_lower]
-        if isinstance(jdata.get("company_stats"), list):
-            jdata["company_stats"] = [s for s in jdata["company_stats"] if s.get("company", "").lower() != name_lower]
-        with open(fpath, "w") as f:
-            json.dump(jdata, f, indent=2)
 
     return jsonify({"ok": True, "removed": name})
 
 
 @app.route("/api/companies")
 def companies():
-    import re as _re
-    # Parse COMPANIES list from ats_scout.py
-    scout_path = "/root/pp-jobapp/scripts/ats_scout.py"
-    scout = open(scout_path).read()
-    pattern = _re.compile(r"COMPANIES\s*=\s*(\[.*?\])", _re.DOTALL)
-    m = pattern.search(scout)
-    companies = []
-    if m:
+    conn = _db_conn()
+    if conn:
         try:
-            companies = eval(m.group(1))
-        except:
-            companies = []
+            companies = storage.load_scout_companies(conn)
+            summary = storage.export_company_scan_summary(conn)
+        finally:
+            conn.close()
+    else:
+        companies = []
+        summary = {"scan_date": None, "stats_by_company": {}}
 
-    # Merge with raw_jobs.json scan stats
-    raw_path = os.path.join(WORKSPACE, "raw_jobs.json")
-    stats_by_company = {}
-    scan_date = None
-    if os.path.exists(raw_path):
-        raw = json.load(open(raw_path))
-        scan_date = raw.get("scan_date", None)
-        for s in raw.get("company_stats", []):
-            stats_by_company[s["company"]] = s
-
+    stats_by_company = summary["stats_by_company"]
+    scan_date = summary["scan_date"]
     result = []
     for c in companies:
         s = stats_by_company.get(c["name"], {})
@@ -578,6 +657,10 @@ bash_jobs = {}
 
 @app.route("/api/bash", methods=["POST"])
 def run_bash():
+    if os.environ.get("PP_JOBAPP_ENABLE_BASH_API") != "1":
+        return jsonify({"error": "bash API disabled"}), 403
+    if request.remote_addr not in ("127.0.0.1", "::1", "localhost"):
+        return jsonify({"error": "bash API is local-only"}), 403
     data = request.json or {}
     command = data.get("command", "").strip()
     if not command:
