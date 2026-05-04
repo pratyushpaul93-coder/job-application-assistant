@@ -471,6 +471,18 @@ incrementally based on miss-pattern analysis.
 `not_found` rows. Set up a weekly cron to run it with default settings,
 so companies that switch ATS providers eventually get re-discovered.
 
+### 7. Twin consolidation pass
+
+When companies appear in DB under multiple normalized_names representing
+the same real-world entity (e.g., 'cohere' / 'coheretechnologies',
+'mistral' / 'mistralai', 'n8n' / 'n8nio'), backfill attaches endpoints
+to whichever twin gets processed first, leaving the other as an orphan
+in the companies table. The orphan is harmless (scout iterates from
+ats_endpoints, not companies), but creates dashboard noise. Build a
+consolidation tool that detects twins via slug collision in
+ats_endpoints, merges them — re-attribute company_sources, mark one
+inactive, preserve provenance.
+
 ---
 
 ## Tech stack
