@@ -423,13 +423,20 @@ def add_company_detect():
         return jsonify({"error": "company name required"}), 400
     website_url = d.get("website_url")
     result = storage.detect_ats(name, website_url)
-    if result:
+    if result and result.get("provider"):
         return jsonify({
             "found": True,
             "ats": result["provider"],
             "slug": result["slug"],
-            "total_jobs": result["total_jobs"],
-            "sample_titles": result["sample_titles"],
+            "total_jobs": result.get("total_jobs"),
+            "sample_titles": result.get("sample_titles", []),
+            "found_via": result.get("found_via", "slug_candidates"),
+        })
+    if result and result.get("dead_url"):
+        return jsonify({
+            "found": False,
+            "dead_url": True,
+            "tried_slugs": result.get("tried_slugs", []),
         })
     return jsonify({"found": False, "tried_slugs": []})
 

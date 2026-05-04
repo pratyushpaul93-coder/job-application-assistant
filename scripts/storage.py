@@ -248,6 +248,15 @@ def add_company_source(
     )
 
 
+ATS_PROVIDERS_SCANNABLE = frozenset({"ashby", "greenhouse", "lever"})
+ATS_PROVIDERS_DETECTABLE = frozenset({
+    "ashby", "greenhouse", "lever",
+    "workable", "smartrecruiters", "bamboohr", "personio",
+    "recruitee", "jazzhr", "teamtailor", "comeet",
+})
+ATS_PROVIDERS_ALLOWED = ATS_PROVIDERS_DETECTABLE | {"broken", "tavily", "unknown"}
+
+
 def upsert_ats_endpoint(
     conn: sqlite3.Connection,
     company_id: int,
@@ -261,20 +270,22 @@ def upsert_ats_endpoint(
 ) -> int:
     provider = (provider or "").strip().lower()
     slug = (slug or "").strip()
-    if provider not in {"ashby", "greenhouse", "lever", "broken", "tavily", "unknown"}:
+    if provider not in ATS_PROVIDERS_ALLOWED:
         provider = "unknown"
     if not slug:
         raise ValueError("ATS slug is required")
     conn.execute(
         """
         INSERT INTO ats_endpoints
-            (company_id, provider, slug, ats_url, status, open_jobs_actual, raw_metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (company_id, provider, slug, ats_url, status, open_jobs_actual,
+             last_checked_at, raw_metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
         ON CONFLICT(provider, slug) DO UPDATE SET
             company_id = excluded.company_id,
             ats_url = COALESCE(NULLIF(excluded.ats_url, ''), ats_endpoints.ats_url),
             status = excluded.status,
             open_jobs_actual = COALESCE(excluded.open_jobs_actual, ats_endpoints.open_jobs_actual),
+            last_checked_at = CURRENT_TIMESTAMP,
             raw_metadata_json = excluded.raw_metadata_json,
             updated_at = CURRENT_TIMESTAMP
         """,
@@ -296,12 +307,14 @@ def upsert_ats_endpoint(
 
 
 def ats_url(provider: str, slug: str) -> str:
+    from urllib.parse import quote
+    encoded = quote(slug or "", safe="")
     if provider == "ashby":
-        return f"https://jobs.ashbyhq.com/{slug}"
+        return f"https://jobs.ashbyhq.com/{encoded}"
     if provider == "greenhouse":
-        return f"https://boards.greenhouse.io/{slug}"
+        return f"https://boards.greenhouse.io/{encoded}"
     if provider == "lever":
-        return f"https://jobs.lever.co/{slug}"
+        return f"https://jobs.lever.co/{encoded}"
     return ""
 
 
@@ -323,67 +336,271 @@ def _http_get_json(url: str, timeout: int = 8) -> Any:
         return None
 
 
+def _http_get_text(url: str, timeout: int = 10) -> str | None:
+    """Pure HTTP helper: GET a URL, return text body (capped) or None on failure."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read().decode("utf-8", errors="ignore")[:300_000]
+    except Exception:
+        return None
+
+
+def _hostname_resolves(url: str) -> bool:
+    """Return False if the URL's hostname is missing or DNS fails (NXDOMAIN, etc)."""
+    import socket
+    from urllib.parse import urlparse
+    try:
+        host = urlparse(url).hostname
+        if not host:
+            return False
+        socket.gethostbyname(host)
+        return True
+    except Exception:
+        return False
+
+
+_DETECT_SUFFIXES = (
+    "hq", "io", "ai", "app", "tech", "data", "labs", "inc", "industries",
+    "health", "bio", "software", "careers", "jobs", "global", "studio",
+    "corp", "co",
+)
+_DETECT_PREFIXES = ("get", "join", "try", "use", "with", "hello")
+_DETECT_STRIP_SUFFIXES = (
+    " labs", " inc", " health", " security", " ai", " technologies",
+    " tech", " bio", " global", " insurance", " systems", " software",
+    " group", " co", " industries",
+)
+_CANDIDATE_CAP = 80
+_FALSE_POSITIVE_SLUGS = frozenset({"embed", "jobs", "careers", "job_board", "demo"})
+
+
+def _candidate_slugs(name: str, website_url: str | None = None) -> list[str]:
+    """Generate up to 80 deduped slug candidates for a company name + optional URL."""
+    base = re.sub(r"[^a-z0-9]", "", name.lower())
+    base_hyphen = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    cands: list[str] = [base, base_hyphen]
+    for suf in _DETECT_SUFFIXES:
+        cands.append(base + suf)
+        cands.append(base + "-" + suf)
+        if base_hyphen != base:
+            cands.append(base_hyphen + "-" + suf)
+    for pre in _DETECT_PREFIXES:
+        cands.append(pre + base)
+    name_lower = name.lower()
+    for strip in _DETECT_STRIP_SUFFIXES:
+        if name_lower.endswith(strip):
+            stripped = name_lower[: -len(strip)].strip()
+            if stripped:
+                cands.append(re.sub(r"[^a-z0-9]", "", stripped))
+                cands.append(re.sub(r"[^a-z0-9]+", "-", stripped).strip("-"))
+    if website_url:
+        m = re.match(r"https?://(?:www\.)?([^./]+)", website_url)
+        if m:
+            stem = m.group(1).lower()
+            cands.append(stem)
+            cands.append(re.sub(r"[^a-z0-9]", "", stem))
+            cands.append("get" + stem)
+    seen: list[str] = []
+    seen_set: set[str] = set()
+    for c in cands:
+        if not c or len(c) < 2 or c in seen_set:
+            continue
+        seen.append(c)
+        seen_set.add(c)
+        if len(seen) >= _CANDIDATE_CAP:
+            break
+    return seen
+
+
+def _ashby_check(slug: str) -> dict | None:
+    """Hit Ashby; treat any 200 with a `jobs` list as proof the board exists."""
+    from urllib.parse import quote
+    encoded = quote(slug, safe="")
+    data = _http_get_json(
+        f"https://api.ashbyhq.com/posting-api/job-board/{encoded}?includeCompensation=false"
+    )
+    if isinstance(data, dict) and isinstance(data.get("jobs"), list):
+        jobs = data["jobs"]
+        return {
+            "provider": "ashby",
+            "slug": slug,
+            "total_jobs": len(jobs),
+            "sample_titles": [j.get("title", "") for j in jobs[:5]],
+        }
+    return None
+
+
+def _greenhouse_check(slug: str) -> dict | None:
+    from urllib.parse import quote
+    encoded = quote(slug, safe="")
+    data = _http_get_json(
+        f"https://boards-api.greenhouse.io/v1/boards/{encoded}/jobs"
+    )
+    if isinstance(data, dict) and isinstance(data.get("jobs"), list):
+        jobs = data["jobs"]
+        return {
+            "provider": "greenhouse",
+            "slug": slug,
+            "total_jobs": len(jobs),
+            "sample_titles": [j.get("title", "") for j in jobs[:5]],
+        }
+    return None
+
+
+def _lever_check(slug: str) -> dict | None:
+    from urllib.parse import quote
+    encoded = quote(slug, safe="")
+    data = _http_get_json(f"https://api.lever.co/v0/postings/{encoded}")
+    if isinstance(data, list):
+        return {
+            "provider": "lever",
+            "slug": slug,
+            "total_jobs": len(data),
+            "sample_titles": [j.get("text", "") for j in data[:5]],
+        }
+    return None
+
+
+_PROVIDER_CHECKS = {
+    "ashby": _ashby_check,
+    "greenhouse": _greenhouse_check,
+    "lever": _lever_check,
+}
+
+
+def _try_slug_candidates(name: str, website_url: str | None = None) -> dict | None:
+    """Run candidate slugs against Ashby → Greenhouse → Lever, first-hit-wins."""
+    candidates = _candidate_slugs(name, website_url)
+    for provider in ("ashby", "greenhouse", "lever"):
+        check = _PROVIDER_CHECKS[provider]
+        for slug in candidates:
+            hit = check(slug)
+            if hit:
+                hit["tried_slugs"] = candidates
+                hit["found_via"] = "slug_candidates"
+                return hit
+    return None
+
+
+_PROBE_PATHS = (
+    "", "/careers", "/jobs", "/careers/", "/jobs/",
+    "/careers/positions", "/careers/open", "/careers/jobs",
+    "/about/careers", "/company/careers", "/about-us/careers",
+    "/work-with-us", "/join-us", "/company", "/team",
+)
+
+_ATS_SIGNATURES: tuple[tuple[str, str], ...] = (
+    ("greenhouse", r"boards\.greenhouse\.io/embed/job_board\?for=([a-zA-Z0-9_-]+)"),
+    ("greenhouse", r"boards\.greenhouse\.io/([a-zA-Z0-9_-]+)"),
+    ("greenhouse", r"job-boards\.greenhouse\.io/([a-zA-Z0-9_-]+)"),
+    ("ashby",      r"jobs\.ashbyhq\.com/([a-zA-Z0-9_.%-]+?)(?:[/\"'?#]|$)"),
+    ("ashby",      r"embed\.ashbyhq\.com/([a-zA-Z0-9_.%-]+?)(?:[/\"'?#]|$)"),
+    ("lever",      r"jobs\.lever\.co/([a-zA-Z0-9_-]+)"),
+    ("workable",   r"apply\.workable\.com/([a-zA-Z0-9_-]+)"),
+    ("smartrecruiters", r"(?:careers|jobs)\.smartrecruiters\.com/([a-zA-Z0-9_-]+)"),
+    ("bamboohr",   r"([a-zA-Z0-9_-]+)\.bamboohr\.com/(?:jobs|careers)"),
+    ("personio",   r"([a-zA-Z0-9_-]+)\.jobs\.personio\.(?:com|de)"),
+    ("recruitee",  r"([a-zA-Z0-9_-]+)\.recruitee\.com"),
+    ("jazzhr",     r"([a-zA-Z0-9_-]+)\.applytojob\.com"),
+    ("teamtailor", r"([a-zA-Z0-9_-]+)\.teamtailor\.com"),
+    ("comeet",     r"comeet\.co/(?:careers-api|jobs)/[^/]*?/?([A-Z0-9]+\.[0-9]+)"),
+)
+
+
+def _is_false_positive_slug(slug: str) -> bool:
+    if slug.lower() in _FALSE_POSITIVE_SLUGS:
+        return True
+    low = slug.lower()
+    if ".com" in low or ".io" in low:
+        return True
+    return False
+
+
+def _validate_captured_slug(provider: str, slug: str) -> dict | None:
+    """Validate a regex-captured slug against the provider's API.
+
+    For scannable providers (Ashby/GH/Lever): hit the API; require a 200 +
+    valid JSON. Returns None on 404 so the caller treats it as a false
+    positive and keeps searching.
+
+    For non-scannable providers (Workable, Workday, Comeet, etc.): trust
+    the regex since we lack an API check. Caller already filters obvious
+    false-positive slugs.
+    """
+    check = _PROVIDER_CHECKS.get(provider)
+    if check is None:
+        return {"provider": provider, "slug": slug, "total_jobs": None, "sample_titles": []}
+    return check(slug)
+
+
+def probe_website_for_ats(website_url: str) -> dict | None:
+    """Fetch the company's website + careers paths and regex-detect ATS embeds.
+
+    Returns the same shape as `detect_ats()` on hit, None on miss. Called by
+    `detect_ats()` only when slug-based detection fails AND a URL is given.
+    """
+    from urllib.parse import unquote
+    if not website_url:
+        return None
+    base = website_url.rstrip("/")
+    for path in _PROBE_PATHS:
+        full_url = base + path
+        html = _http_get_text(full_url)
+        if not html:
+            continue
+        for provider, pattern in _ATS_SIGNATURES:
+            for m in re.finditer(pattern, html, re.IGNORECASE):
+                raw_slug = m.group(1).rstrip("/")
+                slug = unquote(raw_slug)
+                if _is_false_positive_slug(slug):
+                    continue
+                result = _validate_captured_slug(provider, slug)
+                if result:
+                    result["tried_slugs"] = [full_url]
+                    result["found_via"] = "website_probe"
+                    return result
+    return None
+
+
 def detect_ats(name: str, website_url: str | None = None) -> dict | None:
     """Probe public ATS APIs to discover whether a company has a public job board.
 
     Returns a dict on hit:
         {
-            "provider": "ashby" | "greenhouse" | "lever",
+            "provider": "ashby" | "greenhouse" | "lever" | <other detectable>,
             "slug": "...",
-            "total_jobs": int,
+            "total_jobs": int | None,
             "sample_titles": [str, ...up to 5],
             "tried_slugs": [...],
+            "found_via": "slug_candidates" | "website_probe",
         }
+
+    On dead URL (NXDOMAIN), returns:
+        {"dead_url": True, "tried_slugs": [website_url]}
+
     Returns None on miss.
 
-    Pure function: no DB access, no Flask. Side effects: HTTP requests only.
-    The website_url parameter is accepted but not yet used (reserved for
-    upcoming improvements that derive candidates from the company URL).
+    Strategy:
+      1. DNS pre-flight when website_url is given.
+      2. Slug-candidate probing against Ashby → Greenhouse → Lever.
+      3. Fallback: scrape careers pages for ATS embed signatures.
+
+    Pure: no DB access, no Flask. Side effects: HTTP requests + DNS only.
     """
     name = (name or "").strip()
     if not name:
         return None
-    base = re.sub(r"[^a-z0-9]", "", name.lower())
-    base_hyphen = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    candidates = list(dict.fromkeys(
-        [base, base_hyphen, base + "hq", "get" + base, base + "-ai", base + "so"]
-    ))
-    for slug in candidates:
-        data = _http_get_json(
-            f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=false"
-        )
-        if data and data.get("jobs"):
-            jobs = data["jobs"]
-            return {
-                "provider": "ashby",
-                "slug": slug,
-                "total_jobs": len(jobs),
-                "sample_titles": [j.get("title", "") for j in jobs[:5]],
-                "tried_slugs": candidates,
-            }
-    for slug in candidates:
-        data = _http_get_json(
-            f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
-        )
-        if data and data.get("jobs"):
-            jobs = data["jobs"]
-            return {
-                "provider": "greenhouse",
-                "slug": slug,
-                "total_jobs": len(jobs),
-                "sample_titles": [j.get("title", "") for j in jobs[:5]],
-                "tried_slugs": candidates,
-            }
-    for slug in candidates:
-        data = _http_get_json(f"https://api.lever.co/v0/postings/{slug}")
-        if isinstance(data, list) and data:
-            return {
-                "provider": "lever",
-                "slug": slug,
-                "total_jobs": len(data),
-                "sample_titles": [j.get("text", "") for j in data[:5]],
-                "tried_slugs": candidates,
-            }
+    if website_url and not _hostname_resolves(website_url):
+        return {"dead_url": True, "tried_slugs": [website_url]}
+    hit = _try_slug_candidates(name, website_url)
+    if hit:
+        return hit
+    if website_url:
+        hit = probe_website_for_ats(website_url)
+        if hit:
+            return hit
     return None
 
 
