@@ -395,6 +395,84 @@ PP_JOBAPP_COMPANY_SOURCE=legacy python3 scripts/ats_scout.py
 
 ---
 
+## Future Improvements (Parking Lot)
+
+Items deferred from the May 2026 ATS detection refactor. Pick up in
+priority order based on whatever the current bottleneck is.
+
+### 1. URL enrichment for companies missing website_url
+
+~1,026 companies in the DB have no `website_url`, making them ineligible
+for website-based ATS probing. Many have obvious websites that just
+weren't captured during ingest. Build an `enrich_website_urls()` function
+in `storage.py`:
+
+- For each company without a URL, try `https://{normalized_name}.{com,ai,io,co}`
+- Validate with HEAD request (5s timeout, follow redirects)
+- Populate `companies.website_url` on success
+
+Estimated yield: 200-400 additional ATS endpoints once these companies
+become probe-eligible (rerun `discover_phase` afterward).
+
+### 2. Workday provider support
+
+Cityblock Health was caught probing as Workday in the May 2026 audit, but
+Workday isn't currently a scannable provider. Adding support:
+
+- Workday URL patterns are already in `storage.detect_ats()` probing regex
+- Need to add `fetch_workday()` function to `ats_scout.py` (Workday API has
+  a different shape than Ashby/GH/Lever — uses POST with JSON body)
+- Workday endpoints respond at `{tenant}.wd1.myworkdayjobs.com/{site}/jobs`
+
+Estimated yield: 200+ endpoints based on Workday being common in
+mid-market and enterprise. Some "no_strategy_hit" companies likely live
+here.
+
+### 3. Expand to additional VC sources (5K company target)
+
+Original goal: grow from ~3,170 companies to 5,000+ via additional VC
+portfolios. Deferred until ATS detection caught up — adding companies
+without ATS endpoints just inflates the company count without producing
+job postings. Reconsider once active endpoints are ≥2,000.
+
+Potential sources identified:
+
+- `community.getro.com` aggregates 899 VC firms with public Getro boards
+- Tier 2 Getro VCs: 645 Ventures, 8VC, BCV, Battery, CRV, Emergence,
+  Felicis, FirstMark, Foundation, IVP, Lerer Hippeau, Lux, Mayfield,
+  Menlo, Norwest, Redpoint, Spark, Threshold, Union Square, Upfront
+- YC Work at a Startup (~1,000 companies, scrapable)
+- Tiger Global, Insight Partners, Founders Fund, Coatue, Thrive Capital,
+  Index Ventures (custom scraping required, no Getro)
+
+### 4. JS-rendered careers page support
+
+Some companies (notably Anduril) embed their ATS slug only at runtime via
+JavaScript — the static HTML mentions `greenhouse.io` but the slug is
+fetched async. Currently we miss these unless slug guessing happens to
+work. Options:
+
+- Lightweight: when probing detects "greenhouse.io" mentioned in HTML
+  but no slug pattern matches, retry with our slug-candidate generator
+  against just Greenhouse's API
+- Heavyweight: use Playwright (already a dependency for
+  `getro_capture_xhr`) to render and re-fetch — more reliable but slower
+
+### 5. Long-tail ATS providers
+
+Empathy uses Comeet, which we now support. The long tail likely includes:
+Bullhorn, Recruiterflow, Eightfold, Phenom, iCIMS, Cornerstone, Taleo,
+SuccessFactors, JobScore, Breezy. Add signatures + fetcher functions
+incrementally based on miss-pattern analysis.
+
+### 6. Scheduled re-discovery
+
+`discover_phase()` takes `max_age_days` as a parameter for retrying
+`not_found` rows. Set up a weekly cron to run it with default settings,
+so companies that switch ATS providers eventually get re-discovered.
+
+---
+
 ## Tech stack
 
 Python 3.12 · Flask · WeasyPrint · DeepSeek V3 · Claude Sonnet 4.6 · Claude Haiku 4.5 · Hetzner CX21 · systemd · vanilla JS (no framework)
