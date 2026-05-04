@@ -8,6 +8,31 @@ Built by [Pratyush Paul](https://github.com/pratyushpaul93-coder) during an acti
 
 ---
 
+## Architecture
+
+Pipeline flow: `discover` → `scan` → `score` → `shortlist`
+
+- **Discover**: Find ATS endpoints for companies in DB.
+  `storage.detect_ats(name, website_url)` is the canonical detection
+  function (pure, importable). `ats_scout.discover_phase(conn)`
+  orchestrates discovery across the DB. `tools/backfill_ats_detection.py`
+  is the one-time backfill runner.
+- **Scan**: Pull jobs from known endpoints.
+  `python3 scripts/ats_scout.py` iterates `ats_endpoints` and fetches
+  roles via Ashby/Greenhouse/Lever public APIs.
+- **Score**: DeepSeek-rate jobs against the candidate profile.
+  `python3 scripts/ats_matcher.py` reads `job_postings`, writes `job_scores`.
+- **Shortlist**: Jobs that pass the score threshold are written to
+  `workspace/shortlist.json` for review.
+
+**Day-to-day:** `python3 scripts/ats_scout.py && python3 scripts/ats_matcher.py`
+(or click "Run Scan" in the dashboard). For new ingest sources or
+backfilling, run `python3 scripts/ats_scout.py --discover` first.
+
+See [BACKLOG.md](./BACKLOG.md) for active engineering work.
+
+---
+
 ## The problem
 
 Generic job boards and mass-apply tools optimize for volume. For senior strategy and operations roles — where the right job is one of maybe thirty a week, and the wrong job costs forty-five minutes of resume tailoring — the bottleneck isn't applying faster. It's filtering harder and tailoring better.
@@ -41,7 +66,7 @@ Total cost to operate end-to-end is roughly **$2–3/month** in API spend plus V
 
 ---
 
-## Architecture
+## Architecture details
 
 ### Core principle: LLM only where reasoning is needed
 
@@ -381,107 +406,6 @@ To force that path during debugging:
 ```bash
 PP_JOBAPP_COMPANY_SOURCE=legacy python3 scripts/ats_scout.py
 ```
-
----
-
-## Roadmap
-
-- Remove the legacy hardcoded `COMPANIES` fallback after SQLite-backed Scout/dashboard paths are fully proven
-- Add a first-class company alias/merge layer for semantic duplicates
-- Deduplication across ATS/job aliases where the same role appears through multiple sources
-- `applied_history.json` to flag already-applied companies in fresh scans
-- Wire the Form D scraper into the daily pipeline as a "newly-funded" sourcing signal
-- Browser agent for assisted (not autonomous) form-filling
-
----
-
-## Future Improvements (Parking Lot)
-
-Items deferred from the May 2026 ATS detection refactor. Pick up in
-priority order based on whatever the current bottleneck is.
-
-### 1. URL enrichment for companies missing website_url
-
-~1,026 companies in the DB have no `website_url`, making them ineligible
-for website-based ATS probing. Many have obvious websites that just
-weren't captured during ingest. Build an `enrich_website_urls()` function
-in `storage.py`:
-
-- For each company without a URL, try `https://{normalized_name}.{com,ai,io,co}`
-- Validate with HEAD request (5s timeout, follow redirects)
-- Populate `companies.website_url` on success
-
-Estimated yield: 200-400 additional ATS endpoints once these companies
-become probe-eligible (rerun `discover_phase` afterward).
-
-### 2. Workday provider support
-
-Cityblock Health was caught probing as Workday in the May 2026 audit, but
-Workday isn't currently a scannable provider. Adding support:
-
-- Workday URL patterns are already in `storage.detect_ats()` probing regex
-- Need to add `fetch_workday()` function to `ats_scout.py` (Workday API has
-  a different shape than Ashby/GH/Lever — uses POST with JSON body)
-- Workday endpoints respond at `{tenant}.wd1.myworkdayjobs.com/{site}/jobs`
-
-Estimated yield: 200+ endpoints based on Workday being common in
-mid-market and enterprise. Some "no_strategy_hit" companies likely live
-here.
-
-### 3. Expand to additional VC sources (5K company target)
-
-Original goal: grow from ~3,170 companies to 5,000+ via additional VC
-portfolios. Deferred until ATS detection caught up — adding companies
-without ATS endpoints just inflates the company count without producing
-job postings. Reconsider once active endpoints are ≥2,000.
-
-Potential sources identified:
-
-- `community.getro.com` aggregates 899 VC firms with public Getro boards
-- Tier 2 Getro VCs: 645 Ventures, 8VC, BCV, Battery, CRV, Emergence,
-  Felicis, FirstMark, Foundation, IVP, Lerer Hippeau, Lux, Mayfield,
-  Menlo, Norwest, Redpoint, Spark, Threshold, Union Square, Upfront
-- YC Work at a Startup (~1,000 companies, scrapable)
-- Tiger Global, Insight Partners, Founders Fund, Coatue, Thrive Capital,
-  Index Ventures (custom scraping required, no Getro)
-
-### 4. JS-rendered careers page support
-
-Some companies (notably Anduril) embed their ATS slug only at runtime via
-JavaScript — the static HTML mentions `greenhouse.io` but the slug is
-fetched async. Currently we miss these unless slug guessing happens to
-work. Options:
-
-- Lightweight: when probing detects "greenhouse.io" mentioned in HTML
-  but no slug pattern matches, retry with our slug-candidate generator
-  against just Greenhouse's API
-- Heavyweight: use Playwright (already a dependency for
-  `getro_capture_xhr`) to render and re-fetch — more reliable but slower
-
-### 5. Long-tail ATS providers
-
-Empathy uses Comeet, which we now support. The long tail likely includes:
-Bullhorn, Recruiterflow, Eightfold, Phenom, iCIMS, Cornerstone, Taleo,
-SuccessFactors, JobScore, Breezy. Add signatures + fetcher functions
-incrementally based on miss-pattern analysis.
-
-### 6. Scheduled re-discovery
-
-`discover_phase()` takes `max_age_days` as a parameter for retrying
-`not_found` rows. Set up a weekly cron to run it with default settings,
-so companies that switch ATS providers eventually get re-discovered.
-
-### 7. Twin consolidation pass
-
-When companies appear in DB under multiple normalized_names representing
-the same real-world entity (e.g., 'cohere' / 'coheretechnologies',
-'mistral' / 'mistralai', 'n8n' / 'n8nio'), backfill attaches endpoints
-to whichever twin gets processed first, leaving the other as an orphan
-in the companies table. The orphan is harmless (scout iterates from
-ats_endpoints, not companies), but creates dashboard noise. Build a
-consolidation tool that detects twins via slug collision in
-ats_endpoints, merges them — re-attribute company_sources, mark one
-inactive, preserve provenance.
 
 ---
 
