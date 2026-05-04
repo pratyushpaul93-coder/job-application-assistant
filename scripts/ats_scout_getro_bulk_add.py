@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 ats_scout_getro_bulk_add.py — Process the 779 Getro VC companies through
-the dashboard's add_company flow and emit a single rich state CSV
-(ats_mapping_779.csv). Resumable via the existing bulk_add_results.csv
-checkpoint shared with bulk_add_companies.py.
+the ATS detect/confirm flow directly via storage.py and emit a single rich
+state CSV (ats_mapping_779.csv). Resumable via the existing
+bulk_add_results.csv checkpoint shared with bulk_add_companies.py.
 
 USAGE:
     python3 ats_scout_getro_bulk_add.py --sleep 0.5
@@ -15,13 +15,17 @@ INPUTS:
 OUTPUT:
     /root/pp-jobapp/workspace/ats_mapping_779.csv
 """
-import argparse, csv, json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
+import argparse, csv, os, re, sys, time, urllib.parse
+
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SCRIPTS_DIR)
+import storage
 
 INPUT_CSV  = "/home/claude/pp-jobapp/workspace/all_ranked_779.csv"
 OUTPUT_CSV = "/root/pp-jobapp/workspace/ats_mapping_779.csv"
 CHECKPOINT = "/root/pp-jobapp/scripts/bulk_add_results.csv"
 SCOUT_PY   = "/root/pp-jobapp/scripts/ats_scout.py"
-DASHBOARD  = "http://localhost:5000"
+DB_PATH    = "/root/pp-jobapp/workspace/jobapp.db"
 
 NAME_SUFFIXES = (" ai", " labs", " inc", " incorporated", " technologies",
                  " hq", " co", " corp", " ltd", " llc", " gmbh")
@@ -102,24 +106,6 @@ def build_ats_url(ats, slug):
     if ats == "greenhouse": return f"https://boards.greenhouse.io/{slug}"
     if ats == "lever":      return f"https://jobs.lever.co/{slug}"
     return ""
-
-
-def post(path, payload, timeout=90):
-    req = urllib.request.Request(
-        DASHBOARD + path,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.status, json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        try:    body = json.loads(e.read().decode())
-        except: body = None
-        return e.code, body
-    except Exception as e:
-        return None, {"error": f"{type(e).__name__}: {e}"}
 
 
 def load_checkpoint():
@@ -204,68 +190,54 @@ def row_from_checkpoint(rec, chk):
     return out
 
 
-def process_live(rec, sleep_s):
-    """Run detect (and confirm if hit) for one company. Returns (mapping_row, checkpoint_row)."""
+def process_live(conn, rec, sleep_s):
+    """Run detect (and register if hit) for one company. Returns (mapping_row, checkpoint_row)."""
     name = rec["company_name"].strip()
     out  = base_mapping_row(rec)
+    company_url = rec.get("company_url", "") or None
 
-    # Pass 1: detect by company_name
-    code, body = post("/api/add_company/detect", {"name": name})
-    if code != 200 or not body:
-        chk = {"company": name, "status": "http_error", "ats": "", "slug": "",
-               "total_jobs": "", "error": f"detect HTTP {code}: {str(body)[:80]}"}
-        out["prior_status"] = f"previously_failed:http_error:{chk['error'][:80]}"
+    result = storage.detect_ats(name, company_url)
+    if not result or not result.get("provider"):
+        tried = result.get("tried_slugs", []) if result else []
+        if result and result.get("dead_url"):
+            err = "dead_url:" + ",".join(tried)
+        else:
+            err = ",".join(tried)
+        chk = {"company": name, "status": "no_ats", "ats": "", "slug": "",
+               "total_jobs": "", "error": err}
         return out, chk
 
-    if not body.get("found"):
-        # Pass 2: try slug derived from company_url as a fresh detect call
-        url_slug = slug_from_url(rec.get("company_url", ""))
-        name_slug = re.sub(r"[^a-z0-9]", "", name.lower())
-        if url_slug and url_slug != name_slug and len(url_slug) >= 3:
-            time.sleep(sleep_s)
-            code2, body2 = post("/api/add_company/detect", {"name": url_slug})
-            if code2 == 200 and body2 and body2.get("found"):
-                body = body2
-            else:
-                tried = ",".join(body.get("tried_slugs", [])) + "|url:" + url_slug
-                chk = {"company": name, "status": "no_ats", "ats": "", "slug": "",
-                       "total_jobs": "", "error": tried}
-                return out, chk
-        else:
-            chk = {"company": name, "status": "no_ats", "ats": "", "slug": "",
-                   "total_jobs": "", "error": ",".join(body.get("tried_slugs", []))}
-            return out, chk
-
-    ats   = body["ats"]
-    slug  = body["slug"]
-    total = body.get("total_jobs", 0)
+    ats   = result["provider"]
+    slug  = result["slug"]
+    total = result.get("total_jobs") or 0
 
     out["ats_provider"]     = ats
     out["ats_slug"]         = slug
     out["ats_url"]          = build_ats_url(ats, slug)
     out["open_jobs_actual"] = total
 
-    # Confirm — registers in COMPANIES list inside ats_scout.py
-    time.sleep(sleep_s)
     stage    = (rec.get("funding_stage") or "Unknown").strip() or "Unknown"
     vertical = out["vertical_assigned"]
-    code, body = post("/api/add_company/confirm",
-                      {"name": name, "ats": ats, "slug": slug,
-                       "stage": stage, "vertical": vertical})
-    if code == 200 and body and body.get("ok"):
-        chk = {"company": name, "status": "added", "ats": ats, "slug": slug,
-               "total_jobs": total, "error": ""}
-        out["prior_status"] = "new"
-        return out, chk
-    if code == 409:
+    existing = storage.get_ats_endpoint(conn, ats, slug)
+    if existing and existing["status"] == "active":
         chk = {"company": name, "status": "duplicate", "ats": ats, "slug": slug,
-               "total_jobs": total, "error": (body or {}).get("error", "")}
+               "total_jobs": total, "error": f"ATS endpoint '{ats}/{slug}' already exists"}
         out["prior_status"] = "already_added"
         return out, chk
+    try:
+        storage.add_dashboard_company(
+            conn, name=name, provider=ats, slug=slug,
+            stage=stage, vertical=vertical, open_jobs_actual=total,
+        )
+    except Exception as e:
+        chk = {"company": name, "status": "exception", "ats": ats, "slug": slug,
+               "total_jobs": total, "error": f"{type(e).__name__}: {e}"}
+        out["prior_status"] = f"previously_failed:exception:{str(e)[:80]}"
+        return out, chk
 
-    chk = {"company": name, "status": "http_error", "ats": ats, "slug": slug,
-           "total_jobs": total, "error": f"confirm HTTP {code}: {str(body)[:80]}"}
-    out["prior_status"] = f"previously_failed:http_error:{chk['error'][:80]}"
+    chk = {"company": name, "status": "added", "ats": ats, "slug": slug,
+           "total_jobs": total, "error": ""}
+    out["prior_status"] = "new"
     return out, chk
 
 
@@ -286,72 +258,71 @@ def main():
     print(f"Checkpoint has {len(chk_index)} prior rows in {CHECKPOINT}")
     print(f"Seed (COMPANIES list) has {len(seed_index)} entries in {SCOUT_PY}")
 
-    consecutive_http_errors = 0
+    if not os.path.exists(DB_PATH):
+        print(f"FATAL: SQLite DB not found at {DB_PATH}")
+        sys.exit(1)
+    conn = storage.connect(DB_PATH)
+
     mapping_rows = []
-    counters = {"new_added": 0, "new_no_ats": 0, "new_http_error": 0,
+    counters = {"new_added": 0, "new_no_ats": 0, "new_exception": 0,
                 "already_added": 0, "previously_failed": 0}
 
-    for i, rec in enumerate(rows, 1):
-        name = rec["company_name"].strip()
-        key  = norm_name(name)
+    try:
+        for i, rec in enumerate(rows, 1):
+            name = rec["company_name"].strip()
+            key  = norm_name(name)
 
-        # Priority 1: COMPANIES list in ats_scout.py (canonical registry)
-        if key in seed_index:
-            mr = row_from_seed(rec, seed_index[key])
-            mapping_rows.append(mr)
-            counters["already_added"] += 1
-            print(f"[{i:4d}/{len(rows)}] = {name:35s} -> seed/{seed_index[key].get('ats','?')}/{seed_index[key].get('slug','?')}")
-            continue
-
-        # Priority 2: bulk_add_results.csv checkpoint
-        if key in chk_index:
-            mr = row_from_checkpoint(rec, chk_index[key])
-            mapping_rows.append(mr)
-            if mr["prior_status"] == "already_added":
+            # Priority 1: COMPANIES list in ats_scout.py (canonical registry)
+            if key in seed_index:
+                mr = row_from_seed(rec, seed_index[key])
+                mapping_rows.append(mr)
                 counters["already_added"] += 1
-                marker = "="
+                print(f"[{i:4d}/{len(rows)}] = {name:35s} -> seed/{seed_index[key].get('ats','?')}/{seed_index[key].get('slug','?')}")
+                continue
+
+            # Priority 2: bulk_add_results.csv checkpoint
+            if key in chk_index:
+                mr = row_from_checkpoint(rec, chk_index[key])
+                mapping_rows.append(mr)
+                if mr["prior_status"] == "already_added":
+                    counters["already_added"] += 1
+                    marker = "="
+                else:
+                    counters["previously_failed"] += 1
+                    marker = "."
+                print(f"[{i:4d}/{len(rows)}] {marker} {name:35s} -> {mr['prior_status']}")
+                continue
+
+            try:
+                mr, chk = process_live(conn, rec, args.sleep)
+            except Exception as e:
+                chk = {"company": name, "status": "exception", "ats": "", "slug": "",
+                       "total_jobs": "", "error": f"{type(e).__name__}: {e}"}
+                mr = base_mapping_row(rec)
+                mr["prior_status"] = f"previously_failed:exception:{str(e)[:80]}"
+
+            append_checkpoint(chk)
+            mapping_rows.append(mr)
+
+            status = chk["status"]
+            if status == "added":
+                counters["new_added"] += 1; marker = "+"
+            elif status == "no_ats":
+                counters["new_no_ats"] += 1; marker = "-"
+            elif status == "exception":
+                counters["new_exception"] += 1; marker = "X"
+            elif status == "duplicate":
+                counters["already_added"] += 1; marker = "="
             else:
-                counters["previously_failed"] += 1
-                marker = "."
-            print(f"[{i:4d}/{len(rows)}] {marker} {name:35s} -> {mr['prior_status']}")
-            continue
+                counters["new_exception"] += 1; marker = "?"
 
-        try:
-            mr, chk = process_live(rec, args.sleep)
-        except Exception as e:
-            chk = {"company": name, "status": "exception", "ats": "", "slug": "",
-                   "total_jobs": "", "error": f"{type(e).__name__}: {e}"}
-            mr = base_mapping_row(rec)
-            mr["prior_status"] = f"previously_failed:exception:{str(e)[:80]}"
+            extra = (f" ({chk['ats']}/{chk['slug']}, {chk['total_jobs']} jobs)"
+                     if status in ("added", "duplicate") else "")
+            print(f"[{i:4d}/{len(rows)}] {marker} {name:35s} -> {status}{extra}")
 
-        append_checkpoint(chk)
-        mapping_rows.append(mr)
-
-        status = chk["status"]
-        if status == "added":
-            counters["new_added"] += 1; marker = "+"
-            consecutive_http_errors = 0
-        elif status == "no_ats":
-            counters["new_no_ats"] += 1; marker = "-"
-            consecutive_http_errors = 0
-        elif status == "http_error":
-            counters["new_http_error"] += 1; marker = "!"
-            consecutive_http_errors += 1
-        elif status == "duplicate":
-            counters["already_added"] += 1; marker = "="
-            consecutive_http_errors = 0
-        else:
-            counters["new_http_error"] += 1; marker = "?"
-
-        extra = (f" ({chk['ats']}/{chk['slug']}, {chk['total_jobs']} jobs)"
-                 if status in ("added", "duplicate") else "")
-        print(f"[{i:4d}/{len(rows)}] {marker} {name:35s} -> {status}{extra}")
-
-        if consecutive_http_errors >= 5:
-            print(f"!! 5 consecutive HTTP errors. Aborting; rerun later to resume.")
-            break
-
-        time.sleep(args.sleep)
+            time.sleep(args.sleep)
+    finally:
+        conn.close()
 
     # Write ats_mapping_779.csv
     os.makedirs(os.path.dirname(OUTPUT_CSV), exist_ok=True)
@@ -370,7 +341,7 @@ def main():
     t1_known = sum(1 for r in tier1 if r["ats_provider"] != "unknown")
 
     print("\n=== SUMMARY ===")
-    for k in ("new_added", "new_no_ats", "new_http_error",
+    for k in ("new_added", "new_no_ats", "new_exception",
               "already_added", "previously_failed"):
         print(f"  {k:22s} {counters[k]}")
     print(f"\n  ATS provider breakdown (all 779):")
