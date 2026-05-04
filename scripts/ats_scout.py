@@ -1034,138 +1034,139 @@ def fetch_lever(company):
         })
     return matches, len(data)
 
-# ============================================================
-# Main scan loop
-# ============================================================
+if __name__ == "__main__":
+    # ============================================================
+    # Main scan loop
+    # ============================================================
 
-print("PP Job Scout - ATS API Scan (v2)")
-print("Date: " + str(datetime.date.today()))
-SCAN_COMPANIES, COMPANY_SOURCE = load_companies_from_db()
-print("Company source: " + COMPANY_SOURCE)
-print("Companies: " + str(len(SCAN_COMPANIES)))
-print("Config: " + CONFIG_PATH + " (v" + str(CONFIG.get('_version', '?')) + ")")
-print("JD fallback enabled: " + str(JD_FALLBACK_ENABLED))
-print("-" * 50)
+    print("PP Job Scout - ATS API Scan (v2)")
+    print("Date: " + str(datetime.date.today()))
+    SCAN_COMPANIES, COMPANY_SOURCE = load_companies_from_db()
+    print("Company source: " + COMPANY_SOURCE)
+    print("Companies: " + str(len(SCAN_COMPANIES)))
+    print("Config: " + CONFIG_PATH + " (v" + str(CONFIG.get('_version', '?')) + ")")
+    print("JD fallback enabled: " + str(JD_FALLBACK_ENABLED))
+    print("-" * 50)
 
-all_jobs = []
-errors = []
-company_stats = []
+    all_jobs = []
+    errors = []
+    company_stats = []
 
-# ============================================================
-# DB connection for direct writes. job_postings is the source of
-# truth; raw_jobs.json is written below as a backup-only artifact.
-# ============================================================
-db_conn = None
-db_jobs_written = 0
-if os.path.exists(DB_PATH):
-    sys.path.insert(0, SCRIPTS)
-    import storage  # noqa: E402
-    db_conn = storage.connect(DB_PATH)
-    print("DB writes: ENABLED (" + DB_PATH + ")")
-else:
-    print("DB writes: DISABLED (no DB at " + DB_PATH + ")")
+    # ============================================================
+    # DB connection for direct writes. job_postings is the source of
+    # truth; raw_jobs.json is written below as a backup-only artifact.
+    # ============================================================
+    db_conn = None
+    db_jobs_written = 0
+    if os.path.exists(DB_PATH):
+        sys.path.insert(0, SCRIPTS)
+        import storage  # noqa: E402
+        db_conn = storage.connect(DB_PATH)
+        print("DB writes: ENABLED (" + DB_PATH + ")")
+    else:
+        print("DB writes: DISABLED (no DB at " + DB_PATH + ")")
 
-for company in SCAN_COMPANIES:
-    ats = company['ats']
-    try:
-        if ats == 'ashby':
-            matches, total = fetch_ashby(company)
-        elif ats == 'greenhouse':
-            matches, total = fetch_greenhouse(company)
-        elif ats == 'lever':
-            matches, total = fetch_lever(company)
-        else:
-            company_stats.append({'company': company['name'], 'ats': 'custom', 'total_jobs': 0, 'matches': 0, 'status': 'skipped'})
-            continue
-        status = 'ok' if total > 0 else 'empty'
-        if total > 0 or len(matches) > 0:
-            print("  " + company['name'] + " (" + ats + "): " + str(len(matches)) + " matches / " + str(total) + " total")
-        all_jobs.extend(matches)
-        company_stats.append({'company': company['name'], 'ats': ats, 'total_jobs': total, 'matches': len(matches), 'status': status})
-
-        # Direct DB write — happens per company so partial failures don't lose data.
-        if db_conn is not None and matches:
-            endpoint = storage.get_ats_endpoint(db_conn, ats, company['slug'])
-            if endpoint is None:
-                print("  WARN: no ats_endpoints row for " + company['name'] + " (" + ats + "/" + company['slug'] + "); skipping DB write")
+    for company in SCAN_COMPANIES:
+        ats = company['ats']
+        try:
+            if ats == 'ashby':
+                matches, total = fetch_ashby(company)
+            elif ats == 'greenhouse':
+                matches, total = fetch_greenhouse(company)
+            elif ats == 'lever':
+                matches, total = fetch_lever(company)
             else:
-                company_id = endpoint['company_id']
-                endpoint_id = endpoint['id']
-                for j in matches:
-                    storage.upsert_job_posting(db_conn, j, company_id=company_id, ats_endpoint_id=endpoint_id)
-                    db_jobs_written += 1
-                db_conn.commit()
-    except Exception as e:
-        errors.append(company['name'] + ": " + str(e))
-        print("  " + company['name'] + ": ERROR - " + str(e))
-        company_stats.append({'company': company['name'], 'ats': ats, 'total_jobs': 0, 'matches': 0, 'status': 'error'})
+                company_stats.append({'company': company['name'], 'ats': 'custom', 'total_jobs': 0, 'matches': 0, 'status': 'skipped'})
+                continue
+            status = 'ok' if total > 0 else 'empty'
+            if total > 0 or len(matches) > 0:
+                print("  " + company['name'] + " (" + ats + "): " + str(len(matches)) + " matches / " + str(total) + " total")
+            all_jobs.extend(matches)
+            company_stats.append({'company': company['name'], 'ats': ats, 'total_jobs': total, 'matches': len(matches), 'status': status})
 
-print("-" * 50)
-print("Total potential matches: " + str(len(all_jobs)))
+            # Direct DB write — happens per company so partial failures don't lose data.
+            if db_conn is not None and matches:
+                endpoint = storage.get_ats_endpoint(db_conn, ats, company['slug'])
+                if endpoint is None:
+                    print("  WARN: no ats_endpoints row for " + company['name'] + " (" + ats + "/" + company['slug'] + "); skipping DB write")
+                else:
+                    company_id = endpoint['company_id']
+                    endpoint_id = endpoint['id']
+                    for j in matches:
+                        storage.upsert_job_posting(db_conn, j, company_id=company_id, ats_endpoint_id=endpoint_id)
+                        db_jobs_written += 1
+                    db_conn.commit()
+        except Exception as e:
+            errors.append(company['name'] + ": " + str(e))
+            print("  " + company['name'] + ": ERROR - " + str(e))
+            company_stats.append({'company': company['name'], 'ats': ats, 'total_jobs': 0, 'matches': 0, 'status': 'error'})
 
-if all_jobs:
-    reason_counts = {}
-    for j in all_jobs:
-        r = j.get('match_reason', 'unknown')
-        reason_counts[r] = reason_counts.get(r, 0) + 1
-    print("Match reasons: " + str(reason_counts))
+    print("-" * 50)
+    print("Total potential matches: " + str(len(all_jobs)))
 
-    # Top matched keywords (helps tune config)
-    kw_counts = {}
-    for j in all_jobs:
-        kw = j.get('matched_keyword', '')
-        if kw:
-            kw_counts[kw] = kw_counts.get(kw, 0) + 1
-    top_kw = sorted(kw_counts.items(), key=lambda x: -x[1])[:10]
-    print("Top matched keywords: " + str(top_kw))
+    if all_jobs:
+        reason_counts = {}
+        for j in all_jobs:
+            r = j.get('match_reason', 'unknown')
+            reason_counts[r] = reason_counts.get(r, 0) + 1
+        print("Match reasons: " + str(reason_counts))
 
-broken = [s['company'] for s in company_stats if s['total_jobs'] == 0 and s['status'] not in ('skipped', 'error')]
-if broken:
-    print("Companies returning 0 jobs (slug likely wrong): " + str(len(broken)))
-    print("  First 20: " + str(broken[:20]))
+        # Top matched keywords (helps tune config)
+        kw_counts = {}
+        for j in all_jobs:
+            kw = j.get('matched_keyword', '')
+            if kw:
+                kw_counts[kw] = kw_counts.get(kw, 0) + 1
+        top_kw = sorted(kw_counts.items(), key=lambda x: -x[1])[:10]
+        print("Top matched keywords: " + str(top_kw))
 
-if all_jobs:
-    sample = all_jobs[0]
-    print("Sample posting date: " + str(sample.get('posted_date', 'N/A')) + " (" + str(sample.get('days_ago', '?')) + " days ago)")
+    broken = [s['company'] for s in company_stats if s['total_jobs'] == 0 and s['status'] not in ('skipped', 'error')]
+    if broken:
+        print("Companies returning 0 jobs (slug likely wrong): " + str(len(broken)))
+        print("  First 20: " + str(broken[:20]))
 
-scan_date = str(datetime.date.today())
-scan_method = 'ats_api_direct_v2'
-config_version = CONFIG.get('_version', 'unknown')
+    if all_jobs:
+        sample = all_jobs[0]
+        print("Sample posting date: " + str(sample.get('posted_date', 'N/A')) + " (" + str(sample.get('days_ago', '?')) + " days ago)")
 
-# ============================================================
-# Record scan_run in DB (canonical) + write raw_jobs.json (backup).
-# ============================================================
-if db_conn is not None:
-    try:
-        storage.add_scan_run(
-            db_conn,
-            scan_date=scan_date,
-            scan_method=scan_method,
-            config_version=str(config_version),
-            total_companies_scanned=len(SCAN_COMPANIES),
-            total_matches=len(all_jobs),
-            raw_metadata={
-                'company_stats': company_stats,
-                'errors': errors,
-            },
-        )
-        db_conn.commit()
-    finally:
-        db_conn.close()
-    print("DB writes: " + str(db_jobs_written) + " job_postings upserted, scan_run recorded")
+    scan_date = str(datetime.date.today())
+    scan_method = 'ats_api_direct_v2'
+    config_version = CONFIG.get('_version', 'unknown')
 
-output = {
-    'scan_date': scan_date,
-    'scan_method': scan_method,
-    'config_version': config_version,
-    'total_companies_scanned': len(SCAN_COMPANIES),
-    'total_matches': len(all_jobs),
-    'company_stats': company_stats,
-    'jobs': all_jobs,
-    'errors': errors,
-    '_note': 'Backup artifact only. job_postings table is canonical.',
-}
-os.makedirs(WORKSPACE, exist_ok=True)
-with open(WORKSPACE + '/raw_jobs.json', 'w') as f:
-    json.dump(output, f, indent=2)
-print("Backup written: " + WORKSPACE + "/raw_jobs.json")
+    # ============================================================
+    # Record scan_run in DB (canonical) + write raw_jobs.json (backup).
+    # ============================================================
+    if db_conn is not None:
+        try:
+            storage.add_scan_run(
+                db_conn,
+                scan_date=scan_date,
+                scan_method=scan_method,
+                config_version=str(config_version),
+                total_companies_scanned=len(SCAN_COMPANIES),
+                total_matches=len(all_jobs),
+                raw_metadata={
+                    'company_stats': company_stats,
+                    'errors': errors,
+                },
+            )
+            db_conn.commit()
+        finally:
+            db_conn.close()
+        print("DB writes: " + str(db_jobs_written) + " job_postings upserted, scan_run recorded")
+
+    output = {
+        'scan_date': scan_date,
+        'scan_method': scan_method,
+        'config_version': config_version,
+        'total_companies_scanned': len(SCAN_COMPANIES),
+        'total_matches': len(all_jobs),
+        'company_stats': company_stats,
+        'jobs': all_jobs,
+        'errors': errors,
+        '_note': 'Backup artifact only. job_postings table is canonical.',
+    }
+    os.makedirs(WORKSPACE, exist_ok=True)
+    with open(WORKSPACE + '/raw_jobs.json', 'w') as f:
+        json.dump(output, f, indent=2)
+    print("Backup written: " + WORKSPACE + "/raw_jobs.json")
