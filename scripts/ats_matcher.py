@@ -170,9 +170,76 @@ def _save_scores(scored_all):
         conn.close()
 
 
+def _shortlist_from_db():
+    """Read the full current_shortlist set from SQLite for the export file."""
+    if not os.path.exists(DB_PATH):
+        return None
+    storage = _storage()
+    conn = storage.connect(DB_PATH)
+    try:
+        rows = conn.execute(
+            """
+            SELECT j.id, j.title AS role_title, c.canonical_name AS company_name,
+                   j.apply_url, j.job_url, j.location_raw, j.remote_ok,
+                   j.posted_date, j.jd_text, j.raw_json,
+                   c.stage AS company_stage, c.vertical AS industry_vertical,
+                   s.score AS match_score, s.reason AS match_reason,
+                   s.flags_json, s.rubric_version
+            FROM job_scores s
+            JOIN job_postings j ON j.id = s.job_id
+            JOIN companies c ON c.id = j.company_id
+            WHERE s.scorer = ?
+              AND s.score >= 3
+              AND j.status = 'active'
+              AND c.active = 1
+            """,
+            (SCORER,),
+        ).fetchall()
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        try:
+            raw = json.loads(r['raw_json'] or '{}')
+        except Exception:
+            raw = {}
+        j = dict(raw)
+        j.update({
+            'company_name': r['company_name'],
+            'role_title': r['role_title'],
+            'apply_url': r['apply_url'] or r['job_url'] or '',
+            'job_url': r['job_url'] or r['apply_url'] or '',
+            'location_raw': r['location_raw'] or '',
+            'remote_ok': bool(r['remote_ok']),
+            'posted_date': r['posted_date'] or '',
+            'company_stage': r['company_stage'] or 'Unknown',
+            'industry_vertical': r['industry_vertical'] or 'Unknown',
+            'match_score': int(r['match_score']),
+            'match_reason': r['match_reason'] or '',
+            'reason': r['match_reason'] or '',
+            'rubric_version': r['rubric_version'] or '0',
+        })
+        try:
+            j['match_flags'] = json.loads(r['flags_json'] or '[]')
+        except Exception:
+            j['match_flags'] = []
+        if 'jd_text' in j and len(j.get('jd_text', '')) > 500:
+            j['jd_text'] = j['jd_text'][:500] + '...'
+        out.append(j)
+    return out
+
+
 def _write_shortlist_export(scored_all, total_scanned, score_counts, skip_reasons, non_us):
-    """Backup/debug export — dashboard reads from SQLite, not this file."""
-    keepers = [j for j in scored_all if j.get('match_score', 1) >= 3]
+    """Backup/debug export — dashboard reads from SQLite, not this file.
+
+    The export reflects the FULL DB state for current_shortlist, not just the
+    jobs touched in this run. Otherwise a partial / interrupted run would
+    silently truncate the file and break older dashboards that still read it.
+    """
+    keepers = _shortlist_from_db()
+    if keepers is None:
+        # No DB available: fall back to in-memory slice (legacy path).
+        keepers = [j for j in scored_all if j.get('match_score', 1) >= 3]
     keepers.sort(key=lambda j: (
         -j['match_score'],
         0 if j.get('ai_native') else 1,
@@ -625,14 +692,17 @@ def main():
     _save_scores(scored_all)
     _write_shortlist_export(scored_all, len(jobs), score_counts, skip_reasons, non_us)
 
-    keepers = sum(1 for s, c in score_counts.items() if s >= 3 for _ in range(c))
-    print(f'Total scored:      {sum(score_counts.values())}')
+    run_keepers = sum(1 for s, c in score_counts.items() if s >= 3 for _ in range(c))
+    print(f'This run scored:   {sum(score_counts.values())}')
     print(f'Stage breakdown:   manual={counters["manual"]} | prefilter={counters["prefilter"]} '
           f'| cached={counters["cached"]} | deepseek={counters["deepseek"]} '
           f'| ds_err_kept={counters["deepseek_err_kept"]} | ds_err_default={counters["deepseek_err_default"]}')
-    print(f'Score distribution: {dict(sorted(score_counts.items()))}')
-    print(f'Non-US filtered:   {non_us}')
-    print(f'Shortlisted (>=3): {keepers}')
+    print(f'Score distribution (this run): {dict(sorted(score_counts.items()))}')
+    print(f'Non-US filtered (this run):    {non_us}')
+    print(f'This run, score >=3:           {run_keepers}')
+    full = _shortlist_from_db()
+    if full is not None:
+        print(f'Total in shortlist (DB):       {len(full)}')
     print()
     print('Top skip reasons:')
     for r, c in skip_reasons.most_common(8):
