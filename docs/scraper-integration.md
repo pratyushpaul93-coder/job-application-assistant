@@ -81,22 +81,34 @@ to flow through the current Matcher/Dashboard JSON path:
 
 ### 4. Scoring processes
 
-Examples: DeepSeek matcher, deterministic rubric matcher, manual rating.
+The unified `scripts/ats_matcher.py` is the single matcher. It runs three
+stages per job, in order: manual override → deterministic pre-filter (US
+filter, deep-tech hard skips, conditional family rules) → DeepSeek for the
+survivors. Stage 3 is skipped when an existing score at the current
+`RUBRIC_VERSION` is already cached.
 
 Write to:
 
 - `job_scores`
-  - use `storage.add_job_score(...)`
+  - use `storage.add_job_score(..., rubric_version=...)` or
+    `storage.save_job_scores(..., rubric_version=...)`.
 
-Use separate `scorer` values:
+Scorer values:
 
-- `deepseek`
-- `rubric_v22`
-- `current_shortlist`
-- `manual`
+- `current_shortlist` — written by `ats_matcher.py`. The dashboard reads this.
+- `manual` — written when the user enters a manual fit score in the dashboard.
+
+Bumping the rubric: when matcher logic or the DeepSeek prompt changes in a way
+that should invalidate prior scores, bump `RUBRIC_VERSION` in
+`scripts/ats_matcher.py`. Cached scores at the old version will re-score on
+the next run. For an explicit full re-score regardless of version:
+
+```bash
+python3 scripts/ats_matcher.py --rescore-all
+```
 
 The dashboard reads shortlisted jobs from SQLite by joining `job_postings` to
-`job_scores` with scorer `current_shortlist`. Matchers can still export
+`job_scores` with scorer `current_shortlist`. The matcher still exports
 `shortlist.json` as a backup/debug artifact, but the normal UI path no longer
 depends on that file.
 

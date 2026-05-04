@@ -58,9 +58,21 @@ as keys.
 
 ### `job_scores`
 
-One score per scorer per job.
+One score per scorer per job. Carries:
 
-Examples: `current_shortlist`, `manual`, later `deepseek` or `rubric_v22`.
+- `score` (1–5)
+- `reason` (free text)
+- `flags_json` (matcher-emitted flags)
+- `rubric_version` (e.g. `"2.2"`) — used by the matcher's incremental cache to
+  decide whether a stored score is still valid against the current rubric.
+  Defaults to `"0"` for legacy/imported scores so the next matcher run will
+  re-score them under the current rubric.
+
+Scorer values currently in use:
+
+- `current_shortlist` — the unified `ats_matcher.py` writes here. The dashboard
+  reads this scorer for its main job view.
+- `manual` — user-entered scores from the dashboard's fit-rating UI.
 
 ### `job_interactions`
 

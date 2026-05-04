@@ -36,7 +36,10 @@ then projected into dashboard state:
 - `workspace/jobapp.db`
   - `job_postings` is the source of truth for jobs.
   - `job_url_aliases` preserves historical `job_url` / `apply_url` keys.
-  - `job_scores` is the source of truth for shortlist scores.
+  - `job_scores` is the source of truth for shortlist scores. Each row
+    carries a `rubric_version` so the matcher can detect stale scores and
+    re-run them; legacy/imported rows get `'0'`, the unified matcher writes
+    the current `RUBRIC_VERSION` (e.g. `'2.2'`).
   - `job_interactions` is the source of truth for comments, selected,
     reviewed/applied, and manual fit scores.
 

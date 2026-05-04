@@ -34,7 +34,24 @@ def connect(path: str | Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    _ensure_columns(conn)
     return conn
+
+
+def _ensure_columns(conn: sqlite3.Connection) -> None:
+    """Idempotent in-place column migrations for existing DBs.
+
+    Skips silently when the target table doesn't exist yet — init_db will
+    create it from SCHEMA which already includes the latest columns.
+    """
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(job_scores)")}
+    if not cols:
+        return  # table not yet created; nothing to migrate
+    if "rubric_version" not in cols:
+        conn.execute(
+            "ALTER TABLE job_scores ADD COLUMN rubric_version TEXT NOT NULL DEFAULT '0'"
+        )
+        conn.commit()
 
 
 SCHEMA = """
@@ -127,6 +144,7 @@ CREATE TABLE IF NOT EXISTS job_scores (
     score INTEGER NOT NULL,
     reason TEXT,
     flags_json TEXT NOT NULL DEFAULT '[]',
+    rubric_version TEXT NOT NULL DEFAULT '0',
     scored_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(job_id, scorer)
 );
@@ -449,19 +467,33 @@ def add_job_score(
     score: int,
     reason: str = "",
     flags: list[Any] | None = None,
+    rubric_version: str = "0",
 ) -> None:
     conn.execute(
         """
-        INSERT INTO job_scores (job_id, scorer, score, reason, flags_json)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO job_scores (job_id, scorer, score, reason, flags_json, rubric_version)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(job_id, scorer) DO UPDATE SET
             score = excluded.score,
             reason = excluded.reason,
             flags_json = excluded.flags_json,
+            rubric_version = excluded.rubric_version,
             scored_at = CURRENT_TIMESTAMP
         """,
-        (job_id, scorer, score, reason, json_dumps(flags or [])),
+        (job_id, scorer, score, reason, json_dumps(flags or []), rubric_version),
     )
+
+
+def get_job_score(
+    conn: sqlite3.Connection,
+    job_id: int,
+    scorer: str,
+) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT score, reason, flags_json, rubric_version, scored_at "
+        "FROM job_scores WHERE job_id = ? AND scorer = ?",
+        (job_id, scorer),
+    ).fetchone()
 
 
 def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
@@ -471,6 +503,7 @@ def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
     except Exception:
         raw = {}
     job = dict(raw)
+    job["_job_id"] = row["id"]
     job["company_name"] = row["company_name"]
     job["role_title"] = row["title"]
     job["source"] = row["source"]
@@ -509,10 +542,11 @@ def save_job_scores(
     scored_jobs: list[dict[str, Any]],
     *,
     scorer: str = "current_shortlist",
+    rubric_version: str = "0",
 ) -> None:
     """Persist matcher output back to job_scores using URL aliases for identity."""
     for job in scored_jobs:
-        job_id = job_id_for_url(conn, job.get("job_url")) or job_id_for_url(conn, job.get("apply_url"))
+        job_id = job.get("_job_id") or job_id_for_url(conn, job.get("job_url")) or job_id_for_url(conn, job.get("apply_url"))
         if job_id is None:
             continue
         score = job.get("match_score")
@@ -520,7 +554,12 @@ def save_job_scores(
             continue
         reason = job.get("reason") or job.get("match_reason") or ""
         flags = job.get("match_flags") or []
-        add_job_score(conn, job_id, scorer=scorer, score=int(score), reason=reason, flags=flags)
+        rv = job.get("rubric_version") or rubric_version
+        add_job_score(
+            conn, job_id,
+            scorer=scorer, score=int(score), reason=reason, flags=flags,
+            rubric_version=rv,
+        )
     conn.commit()
 
 
