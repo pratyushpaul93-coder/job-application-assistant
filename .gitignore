@@ -18,6 +18,11 @@ dashboard.log
 *.backup_*
 *.v1_final_backup_*
 
+# Local-only experiments (not committed)
+scratch_*.py
+tmp_*.py
+*.scratch.py
+
 # Generated data
 *.json
 *.csv
