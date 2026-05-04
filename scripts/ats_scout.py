@@ -3,6 +3,7 @@ import json, urllib.request, os, datetime, sys
 WORKSPACE = '/root/pp-jobapp/workspace'
 SCRIPTS = '/root/pp-jobapp/scripts'
 CONFIG_PATH = SCRIPTS + '/scout_config.json'
+DB_PATH = WORKSPACE + '/jobapp.db'
 
 # ============================================================
 # Load config from JSON. Edit scout_config.json to tune Scout.
@@ -795,6 +796,33 @@ COMPANIES = [
     {'name': 'TollBit', 'ats': 'greenhouse', 'slug': 'tollbit', 'stage': 'Unknown', 'vertical': 'SaaS'},
 ]
 
+def load_companies_from_db():
+    """Load Scout companies from SQLite, falling back to COMPANIES on error."""
+    source_mode = os.environ.get('PP_JOBAPP_COMPANY_SOURCE', 'auto').lower()
+    if source_mode == 'legacy':
+        return COMPANIES, 'legacy'
+    if source_mode not in ('auto', 'db'):
+        print("WARN: Unknown PP_JOBAPP_COMPANY_SOURCE=" + source_mode + "; using auto")
+    if not os.path.exists(DB_PATH):
+        if source_mode == 'db':
+            print("WARN: SQLite DB not found at " + DB_PATH + "; using legacy COMPANIES")
+        return COMPANIES, 'legacy'
+    try:
+        sys.path.insert(0, SCRIPTS)
+        import storage
+        conn = storage.connect(DB_PATH)
+        try:
+            companies = storage.load_scout_companies(conn)
+        finally:
+            conn.close()
+        if not companies:
+            print("WARN: SQLite company load returned 0 rows; using legacy COMPANIES")
+            return COMPANIES, 'legacy'
+        return companies, 'sqlite'
+    except Exception as e:
+        print("WARN: SQLite company load failed: " + str(e)[:160] + "; using legacy COMPANIES")
+        return COMPANIES, 'legacy'
+
 # ============================================================
 # Helpers
 # ============================================================
@@ -1012,7 +1040,9 @@ def fetch_lever(company):
 
 print("PP Job Scout - ATS API Scan (v2)")
 print("Date: " + str(datetime.date.today()))
-print("Companies: " + str(len(COMPANIES)))
+SCAN_COMPANIES, COMPANY_SOURCE = load_companies_from_db()
+print("Company source: " + COMPANY_SOURCE)
+print("Companies: " + str(len(SCAN_COMPANIES)))
 print("Config: " + CONFIG_PATH + " (v" + str(CONFIG.get('_version', '?')) + ")")
 print("JD fallback enabled: " + str(JD_FALLBACK_ENABLED))
 print("-" * 50)
@@ -1021,7 +1051,7 @@ all_jobs = []
 errors = []
 company_stats = []
 
-for company in COMPANIES:
+for company in SCAN_COMPANIES:
     ats = company['ats']
     try:
         if ats == 'ashby':
@@ -1075,7 +1105,7 @@ output = {
     'scan_date': str(datetime.date.today()),
     'scan_method': 'ats_api_direct_v2',
     'config_version': CONFIG.get('_version', 'unknown'),
-    'total_companies_scanned': len(COMPANIES),
+    'total_companies_scanned': len(SCAN_COMPANIES),
     'total_matches': len(all_jobs),
     'company_stats': company_stats,
     'jobs': all_jobs,

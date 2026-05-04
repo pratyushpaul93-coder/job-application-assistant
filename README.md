@@ -59,17 +59,17 @@ Total cost to operate end-to-end is roughly **$2–3/month** in API spend plus V
 ### Daily pipeline
 
 ```
-ats_scout.py  →  raw_jobs.json
+ats_scout.py  →  jobapp.db/job_postings  (+ raw_jobs.json backup export)
                       ↓
-ats_matcher.py  →  shortlist.json
+ats_matcher.py  →  jobapp.db/job_scores  (+ shortlist.json backup export)
                       ↓
-              Dashboard (review)
+              Dashboard reads SQLite
                       ↓
               [click Tailor on a job]
                       ↓
-tailor.py  →  YYYY-MM-DD_role_company.txt
+tailor.py  →  jobapp.db/resume_artifacts + tailored .txt
                       ↓
-generate_pdf.py  →  YYYY-MM-DD_role_company.pdf
+generate_pdf.py  →  tailored .pdf
 ```
 
 ---
@@ -106,7 +106,7 @@ Most job-search bots use Playwright or scrape rendered HTML. Both are brittle an
 
 Every job is captured with its real posting date, so the dashboard can color-code freshness (green <14 days, amber 15–30, red 30+) and de-prioritize stale listings.
 
-Scout applies title and JD pattern filters from `scripts/scout_config.json` before writing `raw_jobs.json`. This keeps the Matcher's scoring volume manageable and lets users tune their filters without touching code.
+Scout applies title and JD pattern filters from `scripts/scout_config.json` before exporting scan results. The Dashboard scan flow imports those results into SQLite before running the Matcher, and `raw_jobs.json` remains a backup/debug artifact. This keeps the Matcher's scoring volume manageable and lets users tune their filters without touching code.
 
 ---
 
@@ -120,9 +120,9 @@ For each fresh job pulled by Scout, the Matcher calls DeepSeek V3 once to score 
 - **2** — Adjacent role or weak company fit
 - **1** — Skip
 
-Output is `shortlist.json` filtered to scores of 3+.
+Output is written to SQLite `job_scores` under the `current_shortlist` scorer. The matcher can still export `shortlist.json` filtered to scores of 3+ as a backup/debug artifact.
 
-The Matcher reads `feedback.json` on every run, which aggregates dashboard comments and reviewed/applied state from prior cycles. This creates a closed loop: comments left on a job ("too junior," "wrong stack," "great fit") shape how similar roles get scored next time.
+The Matcher reads manual feedback from SQLite on every run, with `feedback.json` as a legacy fallback only if the DB is unavailable. Dashboard fit scores and comments create a closed loop: notes like "too junior," "wrong stack," or "great fit" shape how similar roles get scored next time.
 
 DeepSeek was chosen over GPT-4 / Claude here because the reasoning is light (rubric application) and the volume is high (50–200 jobs/day) — cost matters more than ceiling.
 
@@ -154,8 +154,12 @@ A Flask app that runs as a `systemd` service and survives reboots. Accessible fr
 | `/api/generate_pdf` | POST | Generate PDF from `.txt` |
 | `/api/download_pdf` | GET | Regenerate and serve PDF |
 | `/api/job_status` | POST | Persist Reviewed/Applied state |
-| `/api/add_company` | POST | Add a company with ATS auto-detection |
+| `/api/add_company/detect` | POST | Detect a company's ATS and slug |
+| `/api/add_company/confirm` | POST | Add a detected company to Scout |
 | `/api/companies/delete` | POST | Remove a company and clean workspace |
+
+There is also a local debugging endpoint at `/api/bash`, but it is disabled by default.
+It only responds when `PP_JOBAPP_ENABLE_BASH_API=1` is set and the request comes from localhost.
 
 ---
 
@@ -286,11 +290,39 @@ python3 scripts/ats_matcher.py
 python3 scripts/dashboard.py    # then open http://localhost:5000
 ```
 
+### Smoke test
+
+Run the offline smoke test before changing core scripts:
+
+```bash
+python3 tests/smoke_test.py
+```
+
+### SQLite migration preview
+
+The first storage migration is additive. It builds `workspace/jobapp.db` from
+the current JSON/CSV files without changing Scout, Matcher, Tailor, or the UI:
+
+```bash
+python3 scripts/migrate_to_db.py --reset
+```
+
+See `docs/data-contracts.md` for the current file contracts and cutover
+sequence, `docs/sqlite-schema.md` for the DB tables, and
+`docs/scraper-integration.md` for how new scrapers should write results.
+
+Scout now reads companies from `workspace/jobapp.db` when available and falls
+back to the legacy hardcoded list if needed. To force the old path:
+
+```bash
+PP_JOBAPP_COMPANY_SOURCE=legacy python3 scripts/ats_scout.py
+```
+
 ---
 
 ## Roadmap
 
-- Migrate hardcoded company list out of `ats_scout.py` into a single `companies.json`
+- Remove the legacy hardcoded `COMPANIES` fallback after SQLite-backed Scout/dashboard paths are fully proven
 - Deduplication in Scout output (same role can appear across multiple ATS instances)
 - `applied_history.json` to flag already-applied companies in fresh scans
 - Wire the Form D scraper into the daily pipeline as a "newly-funded" sourcing signal
