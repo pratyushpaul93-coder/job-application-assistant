@@ -29,7 +29,8 @@ Pipeline flow: `discover` → `scan` → `score` → `shortlist`
 (or click "Run Scan" in the dashboard). For new ingest sources or
 backfilling, run `python3 scripts/ats_scout.py --discover` first.
 
-See [BACKLOG.md](./BACKLOG.md) for active engineering work.
+See [BACKLOG.md](./BACKLOG.md) for active engineering work and a dated
+operational log of major changes; `git log` is the canonical change history.
 
 ---
 
