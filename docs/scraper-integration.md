@@ -55,11 +55,16 @@ Write to:
   - unique key is `source + external_job_id`
 - `job_url_aliases`
   - automatically maintained by `upsert_job_posting`
+- `scan_runs`
+  - use `storage.add_scan_run(...)` once per scan to record metadata
+    (date, config version, totals, per-company stats)
 
-Scout may still export `workspace/raw_jobs.json` as a backup artifact, but
-downstream job reads should use SQLite.
-When adding new job scrapers, preserve the same job fields if the results need
-to flow through the current Matcher/Dashboard JSON path:
+Scout writes `job_postings` and `scan_runs` directly. `workspace/raw_jobs.json`
+is also written every run as a backup-only artifact (top-level `_note` field
+marks it as such), but nothing in the live pipeline reads it.
+
+When adding new job scrapers, preserve these field names so the rest of the
+pipeline can consume them without translation:
 
 - `company_name`
 - `role_title`

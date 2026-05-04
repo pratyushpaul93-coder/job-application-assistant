@@ -1,161 +1,142 @@
 # Data Contracts
 
-This document captures the current data flow during the SQLite migration. The
-goal is to make each cutover explicit so Scout, Matcher, Tailor, and the
-dashboard do not break while storage changes underneath.
+`workspace/jobapp.db` is the single source of truth for the job-application
+pipeline. Scout, Matcher, Tailor, and the Dashboard all read and write to it
+directly. JSON exports still exist on disk as backup/debug artifacts, but
+nothing in the live pipeline reads from them.
 
-## Current Sources Of Truth
+## Sources of Truth
 
-### Companies
+### Companies and ATS endpoints
 
-Current company state is split across several files:
+- `companies` — one canonical row per company.
+  Unique key: `normalized_name`.
+- `company_sources` — provenance rows (where each company was first seen).
+  Lets a company appear in many VC lists without becoming many companies.
+- `ats_endpoints` — one row per scannable ATS board.
+  Unique key: `(provider, slug)`.
 
-- `scripts/ats_scout.py`
-  - Contains the hardcoded `COMPANIES` list.
-  - Current Scout source of truth.
-  - Fields: `name`, `ats`, `slug`, `stage`, `vertical`.
-- `scripts/companies_master.txt`
-  - Newline-delimited company names.
-  - Used as a seed/list source, not by Scout directly.
-- `scripts/a16z_companies.txt`
-  - Newline-delimited company names for a16z.
-- `workspace/all_vc_companies.csv`
-  - Getro scrape output.
-  - One row per VC/company appearance, so duplicates across VCs are expected.
-- `workspace/ats_mapping_779.csv`
-  - Ranked Getro-to-ATS mapping output.
-  - Contains ATS provider/slug where detected plus fit/source metadata.
-- `scripts/bulk_add_results.csv`
-  - Checkpoint file for dashboard-driven ATS detection/add flows.
+Seed inputs that bootstrap these tables (one-shot, via
+`scripts/migrate_to_db.py`):
+
+- `scripts/companies_master.txt`, `scripts/a16z_companies.txt` — name lists.
+- `workspace/all_vc_companies.csv` — Getro VC scrape output.
+- `workspace/ats_mapping_779.csv` — ranked Getro→ATS mapping.
+- `scripts/bulk_add_results.csv` — checkpoint from the dashboard's bulk
+  ATS-detection flow.
+
+After bootstrap, mutations come through the dashboard's add/delete endpoints,
+which write directly to `companies` / `ats_endpoints`. The hardcoded
+`COMPANIES` list in `ats_scout.py` is retained only as a last-resort fallback
+when the DB is unreachable; daily scans always read from SQLite.
 
 ### Jobs
 
-Job state is generated from scans, imported into SQLite, scored in SQLite, and
-then projected into dashboard state:
+- `job_postings` — one row per job posting.
+  Unique key: `(source, external_job_id)`. `external_job_id` is extracted
+  from ATS URLs when possible, otherwise derived from a stable hash.
+- `job_url_aliases` — maps every observed `job_url` / `apply_url` to the
+  canonical `job_id`. Lets historical URL-keyed state (and future URL
+  variants from the same ATS) resolve to the same posting.
+- `scan_runs` — one row per Scout invocation, with date, config version,
+  total companies scanned, total matches, and per-company stats in
+  `raw_metadata_json`.
 
-- `workspace/jobapp.db`
-  - `job_postings` is the source of truth for jobs.
-  - `job_url_aliases` preserves historical `job_url` / `apply_url` keys.
-  - `job_scores` is the source of truth for shortlist scores. Each row
-    carries a `rubric_version` so the matcher can detect stale scores and
-    re-run them; legacy/imported rows get `'0'`, the unified matcher writes
-    the current `RUBRIC_VERSION` (e.g. `'2.2'`).
-  - `job_interactions` is the source of truth for comments, selected,
-    reviewed/applied, and manual fit scores.
+Scout writes directly to `job_postings` and `scan_runs` as it scans.
+`workspace/raw_jobs.json` is also written on every run as a
+backup/debug artifact (top-level `_note` field marks it as such), but
+nothing reads it during normal operation.
 
-- `workspace/raw_jobs.json`
-  - Written by `scripts/ats_scout.py`.
-  - Backup/export artifact for compatibility and debugging.
-  - Top-level keys include `scan_date`, `config_version`, `company_stats`,
-    `jobs`, and `errors`.
-- `workspace/shortlist.json`
-  - Written by matcher scripts.
-  - Backup/export artifact for compatibility and debugging.
-  - Contains `total_scanned`, `total_shortlisted`, and `jobs`.
-- Dashboard state files:
-  - `feedback.json`: user fit ratings and comments keyed by URL.
-  - `job_status.json`: reviewed/applied state keyed by URL.
-  - `selected.json`: selected job URLs.
-  - `comments.json`: notes keyed by URL, if present.
-  - `tailored_resumes.json`: tailored resume file metadata keyed by job URL.
+### Scores
 
-## Current Identity Rules
+- `job_scores` — one row per `(job_id, scorer)`. Carries:
+  - `score` (1–5)
+  - `reason` (free text)
+  - `flags_json` (matcher-emitted flags)
+  - `rubric_version` — used by the matcher's incremental cache to decide
+    whether a stored score is still valid against the current rubric
 
-### Company Identity
+Scorer values currently in use:
 
-Current duplicate checks are inconsistent. They use one of:
+- `current_shortlist` — written by `ats_matcher.py`. Dashboard reads this.
+- `manual` — written when the user enters a manual fit score in the
+  dashboard.
 
-- normalized company name
-- ATS provider + ATS slug
-- raw slug string
+The matcher also writes `workspace/shortlist.json` on every run as a
+backup/debug artifact. Its content is queried fresh from `job_scores`,
+so a partial / interrupted run cannot truncate the file.
 
-SQLite target rule:
+### Dashboard / user state
 
-- `companies.normalized_name` is unique.
-- `ats_endpoints(provider, slug)` is unique.
-- A company can have many source rows and one or more ATS endpoints.
+- `job_interactions` — keyed by `job_id`. Stores `selected`, `reviewed`,
+  `applied`, `comment`, `tags_json`, `manual_score`, and
+  `manual_score_comment`.
+- `resume_artifacts` — tailored resume metadata, linked to a job and
+  company where possible. Stores `.txt` and expected `.pdf` filenames.
 
-### Job Identity
+Legacy JSON files (`feedback.json`, `selected.json`, `job_status.json`,
+`tailored_resumes.json`) are no longer read or written by the live pipeline.
+They have been moved to `workspace/archive/json_legacy/` as a frozen
+snapshot of the pre-migration state.
 
-Current dashboard state usually uses `job_url`, but Tailor sometimes receives
-and stores `apply_url`. This can cause tailored files not to map cleanly back to
-cards.
+## Identity Rules
 
-SQLite target rule:
+### Company identity
 
-- Prefer `source + external_job_id`.
-- Fall back to `source + job_url`.
-- Use URL aliases during migration so old `job_url`/`apply_url` keyed state is
-preserved.
+`companies.normalized_name` is unique. A company can have many rows in
+`company_sources` (one per place it was discovered) and one or more rows
+in `ats_endpoints` (typically one, but a company that migrated ATS would
+have two).
 
-## Compatibility Rules During Migration
+### Job identity
 
-Normal runtime should use SQLite:
+Primary key for matching is `(source, external_job_id)`. This is stable
+across re-scans and across `job_url` ↔ `apply_url` divergence.
 
-- Scout still writes `workspace/raw_jobs.json` as a backup/export.
-- Matcher reads jobs from `job_postings`, writes scores to `job_scores`, and
-  exports `workspace/shortlist.json` as a backup/export.
-- Dashboard `/api/data` returns the current JSON response shape, but assembles
-  it from SQLite when `workspace/jobapp.db` exists.
-- Tailor writes `resume_artifacts` and may keep `tailored_resumes.json` as a
-  backup/export.
-- Existing dashboard state keyed by URLs is preserved through
-  `job_url_aliases`.
+For incoming URL-keyed state (historical files, dashboard clicks),
+resolution goes through `job_url_aliases`, which carries every observed
+URL variant for a given `job_id`.
 
-## Refactor Phases
+## Failure modes
 
-1. Add SQLite schema and import scripts without changing live behavior.
-2. Validate imported counts and duplicate constraints against current files.
-3. Change Scout to read active companies from SQLite, while keeping the same
-   `raw_jobs.json` output. This is now implemented with legacy fallback:
-   `ats_scout.py` loads from `workspace/jobapp.db` when present and falls back
-   to the hardcoded `COMPANIES` list if the DB cannot be loaded.
-4. Change dashboard company add/delete endpoints to mutate SQLite, not
-   `ats_scout.py`. This is now implemented. The dashboard companies table reads
-   from SQLite, and add/delete update `companies` and `ats_endpoints`.
-5. Move dashboard job state to stable `job_id`, with URL alias fallback. This
-   is implemented for normal runtime: dashboard job reads come from SQLite,
-   dashboard state writes go to `job_interactions`, and matchers save current
-   scores to `job_scores`. Legacy JSON files remain as fallback/export
-   artifacts.
-6. Remove the hardcoded `COMPANIES` list only after compatibility exports are
-   proven.
+The pipeline is SQLite-native. Components fail loudly when the DB is
+missing rather than silently falling back to JSON:
 
-## Scout Company Source
+- **Dashboard** — `_require_db()` aborts the request with HTTP 500 and a
+  clear message pointing at `scripts/migrate_to_db.py --reset`.
+- **Matcher** — falls back to `raw_jobs.json` for the input read only if
+  `jobapp.db` is missing entirely. Score writes target SQLite first.
+- **Scout** — falls back to the hardcoded `COMPANIES` list if the DB is
+  unreachable; the JSON write happens regardless.
 
-`scripts/ats_scout.py` now supports two company sources:
+## Pipeline flow (live)
 
-- `sqlite`: default when `workspace/jobapp.db` exists and contains Scout rows.
-- `legacy`: hardcoded `COMPANIES` fallback.
+```
+ats_scout.py    → companies/ats_endpoints (read)
+                → job_postings, scan_runs (write, direct)
+                → raw_jobs.json (backup export)
 
-Set `PP_JOBAPP_COMPANY_SOURCE=legacy` to force the old path during debugging.
-Set `PP_JOBAPP_COMPANY_SOURCE=db` to require the SQLite path; if the DB is
-missing or invalid, Scout still falls back but prints a warning.
+ats_matcher.py  → job_postings, job_interactions (read)
+                → job_scores (write, scorer='current_shortlist',
+                              with rubric_version for incremental cache)
+                → shortlist.json (backup export)
 
-The `raw_jobs.json` contract is intentionally unchanged as an export artifact.
-Scout prints the selected company source to stdout. Normal downstream job reads
-should use SQLite after running `scripts/migrate_to_db.py`.
+dashboard.py    → all SQLite reads/writes
+                → scan_status.json, tailor_status.json (transient IPC only)
 
-## Dashboard Mutations
+tailor.py       → resume_artifacts (write)
+                → resumes/tailored/*.txt + *.pdf
 
-Dashboard company mutations now use SQLite:
+migrate_to_db.py → one-shot bootstrap from seed files / legacy backups.
+                  Not part of the daily flow anymore.
+```
 
-- `/api/add_company/confirm` upserts `companies`, adds a `dashboard_manual`
-  source row, and upserts an active `ats_endpoints` row.
-- `/api/companies/delete` marks the company inactive and marks its endpoints
-  `deleted`; it also removes current jobs for that company from the live
-  compatibility JSON files.
-- `/api/companies` reads the SQLite Scout company list.
+## Environment overrides
 
-Dashboard job-state mutations now write SQLite when `workspace/jobapp.db`
-exists, with legacy JSON fallback only if the DB is unavailable:
-
-- comments/selected/reviewed/applied: `job_interactions`
-- manual fit scores: `job_interactions` and `job_scores` with `scorer='manual'`
-
-The matcher feedback loop now reads manual examples from SQLite first and falls
-back to `feedback.json` only when the DB is unavailable or empty.
-
-The dashboard scan route runs Scout, Matcher, then `migrate_to_db.py` so newly
-generated `raw_jobs.json` / `shortlist.json` records are imported into SQLite
-before the scan is marked done.
+- `PP_JOBAPP_COMPANY_SOURCE=legacy` — force Scout to read companies from
+  the hardcoded list (for debugging when the DB is suspected of having
+  bad data).
+- `PP_JOBAPP_COMPANY_SOURCE=db` — require Scout to read from the DB; if
+  the DB is missing it still falls back, but with a warning.
+- `PP_JOBAPP_ENABLE_BASH_API=1` — enable the dashboard's local
+  `/api/bash` debugging endpoint (localhost-only, off by default).
