@@ -101,10 +101,12 @@ Most job-search bots use Playwright or scrape rendered HTML. Both are brittle an
 | Platform | Endpoint | Date field |
 |----------|----------|------------|
 | Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | `publishedAt` |
-| Greenhouse | `api.greenhouse.io/v1/boards/{slug}/jobs` | `updated_at` |
+| Greenhouse | `boards-api.greenhouse.io/v1/boards/{slug}/jobs` | `updated_at` |
 | Lever | `api.lever.co/v0/postings/{slug}` | `createdAt` |
 
 Every job is captured with its real posting date, so the dashboard can color-code freshness (green <14 days, amber 15–30, red 30+) and de-prioritize stale listings.
+
+Scout reads its company registry from SQLite when `workspace/jobapp.db` is present. The legacy hardcoded company list remains only as a fallback while the DB path is proven.
 
 Scout applies title and JD pattern filters from `scripts/scout_config.json` before exporting scan results. The Dashboard scan flow imports those results into SQLite before running the Matcher, and `raw_jobs.json` remains a backup/debug artifact. This keeps the Matcher's scoring volume manageable and lets users tune their filters without touching code.
 
@@ -131,6 +133,12 @@ DeepSeek was chosen over GPT-4 / Claude here because the reasoning is light (rub
 ## Dashboard
 
 A Flask app that runs as a `systemd` service and survives reboots. Accessible from browser and mobile.
+
+The dashboard's normal read path is SQLite-native: jobs come from
+`job_postings`, shortlist scores come from `job_scores`, and comments,
+selected state, reviewed/applied status, manual fit scores, and tailored resume
+mappings are stored against stable DB job IDs. URL aliases preserve historical
+`job_url` / `apply_url` keys from earlier JSON files.
 
 **Features:**
 
@@ -233,11 +241,14 @@ job-application-assistant/
 ├── README.md                              ← this file
 ├── scripts/
 │   ├── ats_scout.py                       ← Scout (Ashby/Greenhouse/Lever) with config-driven filters
-│   ├── ats_matcher.py                     ← DeepSeek scoring + feedback loop
+│   ├── ats_matcher.py                     ← DeepSeek scoring + SQLite feedback loop
 │   ├── dashboard.py                       ← Flask backend
 │   ├── dashboard_ui.html                  ← Frontend
 │   ├── tailor.py                          ← Claude Sonnet 4.6 tailor with framework rules
 │   ├── generate_pdf.py                    ← WeasyPrint PDF generator
+│   ├── storage.py                         ← SQLite schema and storage helpers
+│   ├── migrate_to_db.py                   ← Import legacy JSON/CSV state into SQLite
+│   ├── run_matcher_v22.py                 ← Deterministic rubric matcher variant
 │   │
 │   ├── getro_scraper.py                   ← Production VC portfolio scraper (CSV output, --all/--vc modes)
 │   │
@@ -249,10 +260,19 @@ job-application-assistant/
 │   ├── companies_master.txt               ← Active target company list
 │   └── a16z_companies.txt                 ← Example seed list
 │
+├── docs/
+│   ├── data-contracts.md                  ← Current file/DB contracts and cutover notes
+│   ├── sqlite-schema.md                   ← SQLite table reference
+│   └── scraper-integration.md             ← How new scrapers should write to the DB
+│
+├── tests/
+│   └── smoke_test.py                      ← Offline safety checks
+│
 └── edgar_formd_scraper.py                 ← Adjacent experiment (see below)
 ```
 
-User-specific files (master resume, resume library, applied history) and runtime workspace files (Scout output, dashboard state) are gitignored.
+User-specific files (master resume, resume library, applied history), local DBs,
+runtime workspace files, and generated resumes/PDFs are gitignored.
 
 ---
 
@@ -279,13 +299,17 @@ export DEEPSEEK_API_KEY=your_key_here
 
 # 3. Customize for your search
 #    - Replace resumes/master_resume.txt with your own
-#    - Edit scripts/companies_master.txt with target companies
+#    - Seed companies through SQLite/import scripts or dashboard Add Company
 #    - Edit scripts/scout_config.json with your title/JD patterns
 #    - Adapt the scoring rubric in ats_matcher.py to your criteria
 #    - Rewrite the resume framework in tailor.py to your structure
 
-# 4. Run
+# 4. Initialize SQLite from any seed files / legacy exports
+python3 scripts/migrate_to_db.py --reset
+
+# 5. Run
 python3 scripts/ats_scout.py
+python3 scripts/migrate_to_db.py
 python3 scripts/ats_matcher.py
 python3 scripts/dashboard.py    # then open http://localhost:5000
 ```
@@ -298,21 +322,26 @@ Run the offline smoke test before changing core scripts:
 python3 tests/smoke_test.py
 ```
 
-### SQLite migration preview
+### SQLite storage
 
-The first storage migration is additive. It builds `workspace/jobapp.db` from
-the current JSON/CSV files without changing Scout, Matcher, Tailor, or the UI:
+SQLite is the normal source of truth for companies, ATS endpoints, jobs, scores,
+dashboard state, and tailored resume mappings. The import script builds or
+refreshes `workspace/jobapp.db` from seed files and backup JSON/CSV exports:
 
 ```bash
 python3 scripts/migrate_to_db.py --reset
 ```
 
-See `docs/data-contracts.md` for the current file contracts and cutover
-sequence, `docs/sqlite-schema.md` for the DB tables, and
+See `docs/data-contracts.md` for the current file and DB contracts,
+`docs/sqlite-schema.md` for the DB tables, and
 `docs/scraper-integration.md` for how new scrapers should write results.
 
-Scout now reads companies from `workspace/jobapp.db` when available and falls
-back to the legacy hardcoded list if needed. To force the old path:
+`raw_jobs.json`, `shortlist.json`, and the old dashboard JSON state files are
+kept as backup/debug exports and fallback inputs. Normal Dashboard and Matcher
+reads use SQLite when `workspace/jobapp.db` exists.
+
+Scout reads companies from `workspace/jobapp.db` when available and falls back
+to the legacy hardcoded list if needed. To force the old path:
 
 ```bash
 PP_JOBAPP_COMPANY_SOURCE=legacy python3 scripts/ats_scout.py
@@ -323,7 +352,8 @@ PP_JOBAPP_COMPANY_SOURCE=legacy python3 scripts/ats_scout.py
 ## Roadmap
 
 - Remove the legacy hardcoded `COMPANIES` fallback after SQLite-backed Scout/dashboard paths are fully proven
-- Deduplication in Scout output (same role can appear across multiple ATS instances)
+- Add a first-class company alias/merge layer for semantic duplicates
+- Deduplication across ATS/job aliases where the same role appears through multiple sources
 - `applied_history.json` to flag already-applied companies in fresh scans
 - Wire the Form D scraper into the daily pipeline as a "newly-funded" sourcing signal
 - Browser agent for assisted (not autonomous) form-filling
