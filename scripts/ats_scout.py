@@ -1034,7 +1034,180 @@ def fetch_lever(company):
         })
     return matches, len(data)
 
+
+def discover_phase(conn, limit=None, max_age_days=30):
+    """For every active company missing an ATS endpoint (or with a stale
+    not_found endpoint), run storage.detect_ats() and record the result.
+
+    Hits become status='active', misses become status='not_found' with a
+    placeholder slug (so the UNIQUE(provider, slug) constraint is satisfied).
+    Dead URLs (DNS NXDOMAIN) become provider='broken'.
+
+    Args:
+        conn: open sqlite3.Connection
+        limit: max companies to process this run (None = all eligible)
+        max_age_days: re-try not_found companies after this many days
+
+    Returns:
+        {"tried", "hits", "misses", "dead_urls", "errors", "by_provider"}
+    """
+    import time as _time
+    import traceback as _tb
+    sys.path.insert(0, SCRIPTS)
+    import storage  # noqa: E402
+
+    age_modifier = f"-{int(max_age_days)} days"
+    rows = conn.execute(
+        """
+        SELECT c.id, c.canonical_name, c.website_url
+        FROM companies c
+        WHERE c.active = 1
+          AND NOT EXISTS (
+              SELECT 1 FROM ats_endpoints e
+              WHERE e.company_id = c.id
+                AND e.status IN ('active', 'skipped')
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM ats_endpoints e
+              WHERE e.company_id = c.id
+                AND e.status = 'not_found'
+                AND e.last_checked_at IS NOT NULL
+                AND e.last_checked_at > datetime('now', :age)
+          )
+        ORDER BY c.id
+        """,
+        {"age": age_modifier},
+    ).fetchall()
+    if limit is not None:
+        rows = rows[:limit]
+
+    stats = {
+        "tried": 0, "hits": 0, "misses": 0, "dead_urls": 0, "errors": 0,
+        "by_provider": {},
+    }
+    log_path = WORKSPACE + "/discover_phase.log"
+    os.makedirs(WORKSPACE, exist_ok=True)
+    log_fh = open(log_path, "a")
+    try:
+        log_fh.write(
+            "\n--- discover_phase start " + datetime.datetime.now().isoformat()
+            + " (n=" + str(len(rows)) + ", max_age_days=" + str(max_age_days)
+            + ", limit=" + str(limit) + ") ---\n"
+        )
+        log_fh.flush()
+        for i, row in enumerate(rows, 1):
+            cid = int(row["id"])
+            name = row["canonical_name"]
+            url = row["website_url"]
+            stats["tried"] += 1
+            try:
+                result = storage.detect_ats(name, url)
+            except Exception as e:
+                log_fh.write(
+                    "[" + str(cid) + " " + repr(name) + "] EXCEPTION: "
+                    + type(e).__name__ + ": " + str(e) + "\n" + _tb.format_exc() + "\n"
+                )
+                log_fh.flush()
+                stats["errors"] += 1
+                _time.sleep(0.4)
+                continue
+
+            try:
+                if result and result.get("provider"):
+                    provider = result["provider"]
+                    slug = result["slug"]
+                    total = result.get("total_jobs")
+                    storage.upsert_ats_endpoint(
+                        conn, cid,
+                        provider=provider, slug=slug,
+                        ats_url=storage.ats_url(provider, slug),
+                        status="active",
+                        open_jobs_actual=total if isinstance(total, int) else None,
+                        raw_metadata={"found_via": result.get("found_via", "")},
+                    )
+                    conn.commit()
+                    stats["hits"] += 1
+                    stats["by_provider"][provider] = stats["by_provider"].get(provider, 0) + 1
+                elif result and result.get("dead_url"):
+                    storage.upsert_ats_endpoint(
+                        conn, cid,
+                        provider="broken", slug="_dead_url_" + str(cid),
+                        status="not_found",
+                        open_jobs_actual=0,
+                        raw_metadata={"reason": "dns_nxdomain",
+                                      "tried": result.get("tried_slugs", [])},
+                    )
+                    conn.commit()
+                    stats["dead_urls"] += 1
+                else:
+                    storage.upsert_ats_endpoint(
+                        conn, cid,
+                        provider="unknown", slug="_not_found_" + str(cid),
+                        status="not_found",
+                        open_jobs_actual=0,
+                        raw_metadata={"reason": "no_provider_match"},
+                    )
+                    conn.commit()
+                    stats["misses"] += 1
+            except Exception as e:
+                log_fh.write(
+                    "[" + str(cid) + " " + repr(name) + "] DB upsert failed: "
+                    + type(e).__name__ + ": " + str(e) + "\n"
+                )
+                log_fh.flush()
+                stats["errors"] += 1
+
+            if i % 25 == 0:
+                print(
+                    "  [" + str(i) + "/" + str(len(rows)) + "] "
+                    + "hits=" + str(stats["hits"])
+                    + " misses=" + str(stats["misses"])
+                    + " dead=" + str(stats["dead_urls"])
+                    + " err=" + str(stats["errors"])
+                )
+            _time.sleep(0.4)
+
+        log_fh.write(
+            "--- discover_phase end " + datetime.datetime.now().isoformat()
+            + " stats=" + str(stats) + " ---\n"
+        )
+    finally:
+        log_fh.close()
+    return stats
+
+
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="ATS Scout: scan ATS APIs and (optionally) discover new endpoints.")
+    parser.add_argument("--discover", action="store_true",
+                        help="Run discovery (detect ATS for companies without endpoints)")
+    parser.add_argument("--then-scan", action="store_true",
+                        help="With --discover, also run the scan phase afterward")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="With --discover, cap companies processed (debugging)")
+    parser.add_argument("--max-age-days", type=int, default=30,
+                        help="With --discover, retry not_found rows older than this")
+    args = parser.parse_args()
+
+    run_scan = (not args.discover) or args.then_scan
+
+    if args.discover:
+        sys.path.insert(0, SCRIPTS)
+        import storage  # noqa: E402
+        if not os.path.exists(DB_PATH):
+            print("FATAL: --discover requires SQLite DB at " + DB_PATH)
+            sys.exit(1)
+        print("Discover phase: starting (max_age_days=" + str(args.max_age_days)
+              + ", limit=" + str(args.limit) + ")")
+        _conn = storage.connect(DB_PATH)
+        try:
+            _stats = discover_phase(_conn, limit=args.limit, max_age_days=args.max_age_days)
+        finally:
+            _conn.close()
+        print("Discover phase: done. " + str(_stats))
+        if not run_scan:
+            sys.exit(0)
+
     # ============================================================
     # Main scan loop
     # ============================================================
