@@ -28,7 +28,7 @@ Seed inputs that bootstrap these tables (one-shot, via
 After bootstrap, mutations come through the dashboard's add/delete endpoints,
 which write directly to `companies` / `ats_endpoints`. The hardcoded
 `COMPANIES` list in `ats_scout.py` is retained only as a last-resort fallback
-when the DB is unreachable; daily scans always read from SQLite.
+when the DB is unreachable; Scout always reads from SQLite under normal operation.
 
 ### Jobs
 
@@ -69,15 +69,73 @@ so a partial / interrupted run cannot truncate the file.
 ### Dashboard / user state
 
 - `job_interactions` — keyed by `job_id`. Stores `selected`, `reviewed`,
-  `applied`, `comment`, `tags_json`, `manual_score`, and
-  `manual_score_comment`.
+  `applied`, `reached_out` (added 2026-05-12), `no_outreach` (added
+  2026-05-14), `comment`, `tags_json`, `manual_score`, and
+  `manual_score_comment`. Row-level `updated_at` refreshes on every write
+  via `storage.update_job_interaction`. `reviewed` and `applied` are
+  mutually exclusive end states; `reached_out` and `no_outreach` are
+  sub-states of `applied` and mutually exclusive with each other.
 - `resume_artifacts` — tailored resume metadata, linked to a job and
   company where possible. Stores `.txt` and expected `.pdf` filenames.
+
+#### Dashboard `/api/data` payload — `job_status` shape
+
+```json
+"job_status": {
+  "<url>": {
+    "reviewed":    false,
+    "applied":     true,
+    "reached_out": false,
+    "no_outreach": false,
+    "updated_at":  "2026-05-12 02:33:22"
+  }
+}
+```
+
+The map is keyed by the job's canonical `apply_url` / `job_url` (resolved
+through `job_url_aliases`). Entries only appear for rows where at least one
+of `reviewed`, `applied`, `reached_out`, or `no_outreach` is true.
+`updated_at` is the row's last-modified timestamp and is the sort key for
+the dashboard's "To reach out" column. The dashboard's `/api/job_status`
+POST endpoint accepts `field ∈ {reviewed, applied, reached_out,
+no_outreach}` and `value` boolean.
+
+#### Tailored resume snapshot refresh (added 2026-05-12)
+
+`scripts/dashboard.py` keeps two .txt filenames per tailored resume:
+
+- **Canonical** `<YYYY-MM-DD>_<slug>.txt` — what `tailor.py` writes; the
+  source of truth. Registered in `resume_artifacts.filename_txt`.
+- **Standardized** `PPaul_<YYYYMMDD>_<company>_<role>.txt` — derived
+  display/download name, created by `/api/generate_pdf` and refreshed by
+  every subsequent `/api/tailor`, `/api/tailor_manual`, or `/api/revise`
+  via `_refresh_standardized_snapshot(...)`. The Download button points at
+  the standardized .pdf; the helper rebuilds both the .txt copy and the
+  .pdf from the canonical .txt on each post-write trigger so the download
+  is never stale.
 
 Legacy JSON files (`feedback.json`, `selected.json`, `job_status.json`,
 `tailored_resumes.json`) are no longer read or written by the live pipeline.
 They have been moved to `workspace/archive/json_legacy/` as a frozen
 snapshot of the pre-migration state.
+
+#### Outreach: research / compose split (added 2026-05-14)
+
+Outreach generation is two API steps so the (input-token-heavy) research
+call and the compose calls don't collide with Anthropic's per-minute rate
+limit:
+
+- `POST /api/outreach/research` — `{job_id, peek?, force_refresh?}`.
+  `peek:true` is a side-effect-free cache probe (`peek_research()`);
+  default runs/uses `outreach_research_cache` (30-day TTL); `force_refresh`
+  bypasses it. Research per company is paid once.
+- `POST /api/outreach/draft` — composes variants from cached research
+  (still researches if none cached, for backward compat). Compose calls
+  run **serially**, not in a thread pool.
+- `POST /api/outreach/recompose` — `{draft_id, slant}`. Recomposes a single
+  existing draft in place: preserves `id` + `variant_group_id`, resets
+  `original_body` / `edited` / `edit_count`. Used by "Regen alt slant" so
+  the sibling variant is untouched.
 
 ## Identity Rules
 
@@ -128,7 +186,7 @@ tailor.py       → resume_artifacts (write)
                 → resumes/tailored/*.txt + *.pdf
 
 migrate_to_db.py → one-shot bootstrap from seed files / legacy backups.
-                  Not part of the daily flow anymore.
+                  Not part of the run-time flow anymore.
 ```
 
 ## Environment overrides

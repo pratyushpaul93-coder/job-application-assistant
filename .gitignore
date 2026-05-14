@@ -15,6 +15,7 @@ dashboard.log
 
 # Backups
 *.bak
+*.bak.*
 *.backup_*
 *.v1_final_backup_*
 
@@ -31,6 +32,8 @@ tmp_*.py
 *.db-*
 *.pdf
 *.html
+# ...but the design mockups are source, not generated data
+!designs/*.html
 
 # Project-specific
 career-ops/

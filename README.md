@@ -50,11 +50,12 @@ This pipeline is built around three constraints:
 
 The pipeline gives users two complementary ways to find target roles:
 
-**Sourcing breadth — VC portfolio scraping.** A scraper pulls portfolio companies from major VC job boards (Accel, General Catalyst, Lightspeed, Sequoia, Kleiner Perkins, Greylock — all powered by Getro). At time of publishing, this surfaced roughly 2,000 portfolio companies across the six VCs covered. These can be filtered into a working target list and fed into the daily Scout.
+**Sourcing breadth — VC portfolio scraping.** A scraper pulls portfolio companies from major VC job boards (Accel, General Catalyst, Lightspeed, Sequoia, Kleiner Perkins, Greylock — all powered by Getro). At time of publishing, this surfaced roughly 2,000 portfolio companies across the six VCs covered. These can be filtered into a working target list and fed into Scout.
 
-**Sourcing precision — manual company adds.** Users can add specific target companies one at a time through the dashboard or via CLI, with automatic ATS detection (Ashby, Greenhouse, Lever).
+**Sourcing precision — manual company adds.** Users can add specific target companies one at a time through the dashboard or via CLI, with automatic ATS detection (Ashby, Greenhouse, Lever, Workday).
 
-Once a company is in the target list, the daily pipeline runs automatically:
+The pipeline is operator-triggered (no cron); each stage is an idempotent
+script the user runs when they want a fresh pull:
 
 1. **Scout** scans every target company by hitting their public ATS JSON endpoints — no scraping, no Playwright, no auth — and applies title and JD pattern filters from a config file. Results are written directly to SQLite.
 2. **Matcher** scores every fresh role 1–5 in a four-stage pipeline (manual override → deterministic pre-filter → cache hit → DeepSeek V3 for the survivors), with an incremental cache so cost stays flat as the pool grows.
@@ -77,12 +78,14 @@ Total cost to operate end-to-end is roughly **$2–3/month** in API spend plus V
 | Matcher | `ats_matcher.py` | DeepSeek V3 (`deepseek-chat`) | Cheap reasoning ($0.002/job) for relevance scoring |
 | Dashboard | `dashboard.py` + `dashboard_ui.html` | Flask + vanilla JS | Local review UI, no deployment overhead |
 | Resume Tailor | `tailor.py` | Claude Sonnet 4.6 (`claude-sonnet-4-6`) | Quality matters — used sparingly, only on selected roles |
-| Resume Revise | `dashboard.py` (inline editor) | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Fast follow-up edits to an already-tailored resume — Haiku is sufficient for revision instructions |
+| Resume Regenerate | `dashboard.py` `/api/regenerate` | Claude Sonnet 4.6 (`claude-sonnet-4-6`) | Full re-tailor from master + JD + user comments. Use when initial tailoring missed the right framing |
+| Resume Revise | `dashboard.py` `/api/revise` | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | Fast follow-up edits to an already-tailored resume — Haiku is sufficient for narrow revision instructions |
 | PDF Generator | `generate_pdf.py` | WeasyPrint | Open-source, deterministic, no template lock-in |
+| External list ingest | `scripts/ingest/<source>.py` | Convention + shared helper | Fortune 1000 (Kaggle), Built In BPTW (web scrape), Tavily URL recovery — added 2026-05-11/12 |
 | VC Sourcing | `getro_scraper.py` | Getro internal APIs | ~2,000 companies across 6 top-tier VCs |
-| Bulk Onboarding | `bulk_add_companies.py`, `ats_scout_getro_bulk_add.py` | ATS auto-detection | Batch-imports VC scrape results into the daily Scout |
+| Bulk Onboarding | `bulk_add_companies.py`, `ats_scout_getro_bulk_add.py` | ATS auto-detection | Batch-imports VC scrape results into Scout |
 
-### Daily pipeline
+### Pipeline (operator-triggered)
 
 ```
 ats_scout.py    →  job_postings + scan_runs       (+ raw_jobs.json backup)
@@ -129,17 +132,20 @@ VC portfolio scraping is one approach to sourcing breadth, not the only one. Ope
 
 ## Scout: Direct ATS API Fetcher
 
-Most job-search bots use Playwright or scrape rendered HTML. Both are brittle and prone to silent breakage. The actual ATS platforms (Ashby, Greenhouse, Lever) all expose **public JSON endpoints** that require no auth — they were built to power third-party job boards. Scout uses them directly:
+Most job-search bots use Playwright or scrape rendered HTML. Both are brittle and prone to silent breakage. The actual ATS platforms (Ashby, Greenhouse, Lever, Workday) all expose **public JSON endpoints** that require no auth — they were built to power third-party job boards. Scout uses them directly:
 
 | Platform | Endpoint | Date field |
 |----------|----------|------------|
 | Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | `publishedAt` |
 | Greenhouse | `boards-api.greenhouse.io/v1/boards/{slug}/jobs` | `updated_at` |
 | Lever | `api.lever.co/v0/postings/{slug}` | `createdAt` |
+| Workday | `{tenant}.{dc}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs` (POST) | `postedOn` (relative string, parsed heuristically) |
 
-Every job is captured with its real posting date, so the dashboard can color-code freshness (green <14 days, amber 15–30, red 30+) and de-prioritize stale listings.
+Workday is structurally different from the other three — POST-based, paginated 20 per page, listing returns title-only with no JD. Scout therefore runs a two-stage flow for Workday: listing fetch → drop title-negative rejections → parallel JD fetch via the per-job cxs endpoint, with a 30-day DB-backed cache (`workday_job_jds` table). This brings Workday matching to behavioral parity with the others (`jd_fallback` fires).
 
-Scout reads its company registry from SQLite (`companies` joined to `ats_endpoints`) and writes matches directly to `job_postings` as it scans, with one `scan_runs` row recorded at the end. `workspace/raw_jobs.json` is also written on every run as a backup-only artifact — nothing in the live pipeline reads it. A hardcoded `COMPANIES` list in `ats_scout.py` remains as a fallback for when the DB is unreachable (slated for removal — see [BACKLOG.md item 14](./BACKLOG.md)).
+Every job is captured with its real posting date, so the dashboard can color-code freshness (green <14 days, amber 15–30, red 30+) and de-prioritize stale listings. Scout itself applies a configurable **recency filter** (`max_job_age_days` in `scout_config.json`, default 14) at the fetcher level — jobs older than the cutoff are dropped before scoring, capping DeepSeek spend on stale postings. Workday rows carry an approximate `posted_date` derived from the relative `postedOn` string (`today - days_ago`).
+
+Scout reads its company registry from SQLite (`companies` joined to `ats_endpoints`) and writes matches directly to `job_postings` as it scans, with one `scan_runs` row recorded at the end. `workspace/raw_jobs.json` is also written on every run as a backup-only artifact — nothing in the live pipeline reads it. A hardcoded `COMPANIES` list in `ats_scout.py` remains as a fallback for when the DB is unreachable (slated for removal — see [BACKLOG.md item 13](./BACKLOG.md)).
 
 Title and JD pattern filters live in `scripts/scout_config.json` and run before any DB write, so the Matcher's scoring volume stays manageable and filters can be tuned without touching code.
 
@@ -187,31 +193,90 @@ stable DB job IDs. URL aliases (`job_url_aliases`) resolve historical
 missing, every endpoint returns `HTTP 500` with a clear pointer to
 `migrate_to_db.py`, so stale-data bugs surface loudly.
 
+`days_ago` is **recomputed live** from `posted_date` on every `/api/data`
+request (`storage._compute_days_ago`), not read from the value frozen
+into `raw_json` at scout time. So freshness stats and the `Posted <14d`
+filter stay accurate even between scout runs.
+
+**Visual system (2026-05-12 redesign).** Linear/Vercel-leaning SaaS aesthetic.
+Token-driven CSS: a single `:root{}` block at the top of `dashboard_ui.html`
+defines colors (single indigo accent `#5b5bd6`, neutrals + semantic), type
+(Inter via `rsms.me/inter` with system fallback, 11-28px ramp), spacing
+(4px grid), three-tier shadow, focus ring, and motion. Every component
+consumes those tokens via `var(--...)`. Mockups for the design language live
+in `/root/pp-jobapp/designs/` and are browseable on the running dashboard at
+`/designs/` (a read-only Flask route).
+
 **Features:**
 
-- Stats bar — total scanned, shortlisted, selected, commented
-- Filter pills — score (5/4/3), Selected, Commented, Posted <14d, Tailored, Reviewed, Applied
+- Stats bar — total scanned, shortlisted, reviewed, applied
+- Filter pills + multi-select dropdowns — score (5/4/3), VC, Reviewed, Applied
 - Search — by role or company
-- Job cards — score badge, company, location, stage, posting date with freshness color, SQL flag
-- Per-job actions — Apply (deep link to ATS), View JD, Tailor (fires `tailor.py`, polls until done), Comment (free text, fed into Matcher feedback loop), Mark Reviewed, Mark Applied
+- Job cards — score badge, company, VC tag, location, stage, posting date with
+  freshness color, SQL flag. Job title is itself a hyperlink to the JD (Apply
+  + View JD buttons removed; title-link consolidates them).
+- **Jobs tab — two-section split** (added 2026-05-12):
+  - **To apply** (LEFT) — untouched jobs. Per-section filter pills:
+    All / Untailored / Tailored. Sorted by score desc.
+  - **To reach out** (RIGHT) — reviewed or applied jobs. Per-section pills:
+    `Applied │ Reached out · No outreach · Reviewed` — a divider + "end
+    state" label separate the active queue from the three terminal states.
+    Sorted by most-recently-touched via `job_interactions.updated_at`. The
+    header count always reflects the Applied bucket.
+  Reviewed and Applied are mutually exclusive end states; the UI hides the
+  inactive Mark X once one is set.
+- Stats bar — Total scanned · Shortlisted · Reviewed · Applied · Reached out
+- Per-job actions — Tailor (fires `tailor.py`, polls until done), Comment,
+  Mark Reviewed, **Mark reached out** + **Mark no outreach** (mutually
+  exclusive sub-states of applied), 1-5 fit score, **Draft outreach**
+- Outreach drafter — `Draft outreach` button on reviewed/applied cards
+  opens a modal that generates 2 named-slant variants (e.g. Builder + Tight)
+  for A/B testing. The flow is two explicit clicks — **Research company**
+  (Sonnet 4.6 + web_search, cached per-company 30 days, paid once) then
+  **Generate variants** (composes serially from cached research) — split so
+  the input-heavy research call doesn't collide with the per-minute rate
+  limit. Inline-edit both, recompose a single variant under a different
+  slant, pick a winner, mark sent, tag outcome (response / no_response).
+  See `outreach/` and CHANGELOG 2026-05-13/14.
 - Bulk actions — Tailor selected
-- Resume review panel — Draft tab (current `.txt`), Revise tab (free-text comments → Apply), Generate PDF, inline Download
-- Add Company — type a company name, the system auto-detects ATS and adds it to the daily Scout
+- Resume review panel — Draft tab (current `.txt`), Revision comments
+  textarea, **Apply comments ↻** (Haiku 4.5 inline edit) +
+  **Regenerate** (Sonnet 4.6 full re-tailor with comments injected as
+  USER GUIDANCE), Generate PDF, inline Download. Download regenerates from
+  the canonical .txt via `_refresh_standardized_snapshot()` on every
+  tailor/revise so the file you download is never stale.
+- Pipeline tab — KPI tiles + bespoke SVG-style funnel chart (6 stages,
+  company-scale vs job-scale, color-coded drop deltas) + 2-col supporting
+  tables (gap + provider on left, top-15 companies with sparkbars on right)
+- Add Company — type a company name, the system auto-detects ATS and adds
+  it to Scout's target list
 
 **API endpoints:**
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/tailor` | POST | Trigger `tailor.py` for a job |
-| `/api/tailor_status` | GET | Poll tailor progress |
+| `/api/tailor` | POST | Trigger `tailor.py` for a job (Sonnet 4.6, no comments) |
+| `/api/regenerate` | POST | Re-run `tailor.py` with user comments injected (Sonnet 4.6) |
+| `/api/tailor_status` | GET | Poll tailor / regenerate progress |
 | `/api/tailored_resumes` | GET | List all tailored resume filenames |
-| `/api/revise` | POST | Apply free-text comments to existing tailored `.txt` |
+| `/api/revise` | POST | Apply free-text comments as inline edit (Haiku 4.5) |
 | `/api/generate_pdf` | POST | Generate PDF from `.txt` |
 | `/api/download_pdf` | GET | Regenerate and serve PDF |
-| `/api/job_status` | POST | Persist Reviewed/Applied state |
+| `/api/job_status` | POST | Persist job status (`field ∈ {reviewed, applied, reached_out, no_outreach}`) |
 | `/api/add_company/detect` | POST | Detect a company's ATS and slug |
 | `/api/add_company/confirm` | POST | Add a detected company to Scout |
 | `/api/companies/delete` | POST | Remove a company and clean workspace |
+| `/api/outreach/research` | POST | Research a company (or `peek` the cache). Step 1 of the split outreach flow |
+| `/api/outreach/draft` | POST | Compose 2 outreach variants from cached research (serial compose). Returns `{variant_group_id, slants, drafts, research_cost_usd, compose_cost_usd}`. HTTP 429 if daily cap exceeded |
+| `/api/outreach/recompose` | POST | Recompose a single existing draft under a new slant, in place (sibling variant untouched) |
+| `/api/outreach/drafts` | GET | List all drafts (across variant groups) for a `job_id` |
+| `/api/outreach/counts` | GET | Per-job-url attempt counts (powers the card button badge) |
+| `/api/outreach/slants` | GET | Catalog of available slants (Operator/Builder/Analyst/Tight/Warm) |
+| `/api/outreach/update` | POST | Inline-save edits to a draft's body/subject, or change status to `sent` |
+| `/api/outreach/pick_winner` | POST | Mark a draft as the chosen variant in its group |
+| `/api/outreach/outcome` | POST | Tag a sent draft with `response` or `no_response` |
+| `/api/outreach/delete` | POST | Delete a single variant |
+| `/designs/<path>` | GET | Serve mockup HTML/CSS from `designs/` (read-only) |
 
 There is also a local debugging endpoint at `/api/bash`, but it is disabled by default.
 It only responds when `PP_JOBAPP_ENABLE_BASH_API=1` is set and the request comes from localhost.
@@ -236,9 +301,9 @@ This is personal to the author's resume and history, but the structure generaliz
 8. **Company order enforced** — never reorder roles in Core Experience.
 9. **Per-company bullet counts capped** to prevent the LLM from inventing content (e.g., a role with three real bullets stays at three, never expanded to four).
 10. **Method/how never stripped from bullets** — anti-compression rule.
-11. **Hard requirements flagged at top** (e.g., `[SQL NOTE: required/preferred]`) so the user can deprioritize gating roles.
-12. **Conditional sections** — AI/Technical Projects section only included for AI-native companies or JDs that mention technical skills.
-13. **Hardcoded protections** — load-bearing line items (e.g., a key internship, a credential) verified post-generation and re-injected if the LLM dropped them.
+11. **Conditional sections** — AI/Technical Projects section only included for AI-native companies or JDs that mention technical skills.
+12. **Hardcoded protections** — load-bearing line items (e.g., a key internship, a credential) verified post-generation and re-injected if the LLM dropped them.
+13. **ASCII-only punctuation** — em-dash (`—`) / en-dash (`–`) replaced with hyphen (`-`) throughout the output. Enforced as a prompt rule on `tailor.py` (added 2026-05-12) since the rendered PDF was occasionally mixing both.
 
 ### Resume library context
 
@@ -354,7 +419,7 @@ export DEEPSEEK_API_KEY=your_key_here
 #    (one-shot — only needed on a fresh install or after wiping the DB)
 python3 scripts/migrate_to_db.py --reset
 
-# 5. Run the daily pipeline
+# 5. Run the pipeline (manual; no cron)
 python3 scripts/ats_scout.py        # writes job_postings + scan_runs
 python3 scripts/ats_matcher.py      # writes job_scores
 python3 scripts/dashboard.py        # then open http://localhost:5000
@@ -381,7 +446,7 @@ Tailor, and the Dashboard all read and write the DB directly.
 `migrate_to_db.py` is a **one-shot bootstrap tool** that imports seed files
 (`companies_master.txt`, `all_vc_companies.csv`, `ats_mapping_779.csv`,
 `bulk_add_results.csv`) and any historical JSON/CSV backups into the DB.
-It is not part of the daily pipeline.
+It is not part of the run-time pipeline.
 
 ```bash
 # Fresh install / DB recovery:
@@ -414,6 +479,6 @@ Python 3.12 · Flask · WeasyPrint · DeepSeek V3 · Claude Sonnet 4.6 · Claude
 
 ## Why I built this
 
-I'm looking for senior S&O / GTM Ops / Chief of Staff roles at AI-native and SaaS startups (Series A–D), and I wanted three things from a job-search system: a daily pipeline that surfaced real listings I could trust, scoring grounded in my actual profile rather than keyword overlap, and resume tailoring that didn't fabricate. None of the off-the-shelf tools met all three. So I built this. It saves me roughly six hours a week and has materially improved my application quality.
+I'm looking for senior S&O / GTM Ops / Chief of Staff roles at AI-native and SaaS startups (Series A–D), and I wanted three things from a job-search system: a pipeline I could run on demand that surfaced real listings I could trust, scoring grounded in my actual profile rather than keyword overlap, and resume tailoring that didn't fabricate. None of the off-the-shelf tools met all three. So I built this. It saves me roughly six hours a week and has materially improved my application quality.
 
 If you're hiring for those roles and want to talk: pratyushpaul93@gmail.com · [LinkedIn](https://www.linkedin.com/in/pratyushpaul/)
