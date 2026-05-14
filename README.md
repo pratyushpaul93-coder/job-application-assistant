@@ -10,7 +10,10 @@ Built by [Pratyush Paul](https://github.com/pratyushpaul93-coder) during an acti
 
 ## Architecture
 
-Pipeline flow: `discover` → `scan` → `score` → `shortlist`
+The system has two halves. A **sourcing pipeline** that finds and ranks jobs,
+and a set of **per-job tools** in a Flask dashboard that act on the survivors.
+
+**Sourcing pipeline:** `discover` → `scan` → `score` → `shortlist`
 
 - **Discover**: Find ATS endpoints for companies in DB.
   `storage.detect_ats(name, website_url)` is the canonical detection
@@ -25,9 +28,26 @@ Pipeline flow: `discover` → `scan` → `score` → `shortlist`
 - **Shortlist**: Jobs that pass the score threshold are written to
   `workspace/shortlist.json` for review.
 
+**Per-job tools** (Flask dashboard, human-triggered per job — see the
+[Dashboard](#dashboard) section for details):
+
+- **Tailor**: Customize the master resume against a specific JD
+  (`scripts/tailor.py`, Sonnet 4.6), render to one-page PDF.
+- **Outreach drafter**: Generate post-application outreach messages in the
+  candidate's voice (`scripts/outreach/`, Sonnet 4.6 + cached web research).
+  Produces 2 A/B-testable variants per job from 5 named "slants"; captures
+  edits and send outcomes to improve future drafts. See CHANGELOG 2026-05-13/14.
+- **Job-status tracking**: Reviewed / Applied / Reached-out / No-outreach
+  state per job, plus 1-5 fit scoring.
+
+All components read and write `workspace/jobapp.db` (SQLite) as the canonical
+store — they're loosely coupled at the data layer, so any one can run without
+the others.
+
 **Day-to-day:** `python3 scripts/ats_scout.py && python3 scripts/ats_matcher.py`
 (or click "Run Scan" in the dashboard). For new ingest sources or
-backfilling, run `python3 scripts/ats_scout.py --discover` first.
+backfilling, run `python3 scripts/ats_scout.py --discover` first. Tailor and
+Outreach are triggered per-job from the dashboard.
 
 See [BACKLOG.md](./BACKLOG.md) for active engineering work and a dated
 operational log of major changes; `git log` is the canonical change history.

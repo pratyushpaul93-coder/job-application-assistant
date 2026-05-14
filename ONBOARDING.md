@@ -39,13 +39,20 @@ companies registry (SQLite)
         │
         ▼
   Dashboard (Flask)             ← shortlist UI, fit ratings, comments,
-        │                          tailor trigger, mark applied
-        ▼
-  Tailor (tailor.py)            ← Claude rewrites resume.txt per job
+        │                          job-status tracking, per-job tool triggers
         │
-        ▼
-  Generate PDF (generate_pdf.py)
+        ├─→ Tailor (tailor.py)        ← Claude rewrites resume.txt per job
+        │        └─→ Generate PDF (generate_pdf.py)
+        │
+        └─→ Outreach drafter          ← 2 A/B variants per applied job,
+            (scripts/outreach/)         Sonnet 4.6 + 30-day-cached web
+                                        research; edit + send-outcome capture
 ```
+
+The sourcing pipeline (top, through `job_scores`) is batch and
+operator-triggered. The two per-job tools (Tailor, Outreach) are
+human-triggered one job at a time from the dashboard — they're siblings,
+not a chain, and either can run without the other.
 
 SQLite (`workspace/jobapp.db`) is the **canonical store** for every stage.
 JSON files (`raw_jobs.json`, `shortlist.json`) are backup-only — nothing
@@ -100,6 +107,10 @@ pp-jobapp/
 │   ├── dashboard_ui.html       ← single-page UI
 │   ├── tailor.py               ← Claude resume tailor
 │   ├── generate_pdf.py         ← weasyprint
+│   ├── outreach/               ← outreach drafter (per-job, human-triggered)
+│   │   ├── drafter.py          ←   research + compose orchestration
+│   │   ├── kit.yaml            ←   voice blocks, openers, CTAs, 5 slants
+│   │   └── budget.py           ←   daily-spend cap ($5 default)
 │   ├── url_enrichment.py       ← Tavily / Haiku URL discovery
 │   ├── scout_config.json       ← title + JD patterns, settings
 │   └── keys.py                 ← API keys (gitignored)
