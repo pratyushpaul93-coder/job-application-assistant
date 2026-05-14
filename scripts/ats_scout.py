@@ -22,6 +22,7 @@ JD_FALLBACK_PHRASES = [k.lower() for k in CONFIG.get('jd_fallback_phrases', [])]
 SETTINGS = CONFIG.get('scout_settings', {})
 JD_FALLBACK_ENABLED = SETTINGS.get('jd_fallback_enabled', True)
 JD_CAP = SETTINGS.get('jd_text_cap_chars', 4000)
+MAX_JOB_AGE_DAYS = SETTINGS.get('max_job_age_days', 14)
 
 # ============================================================
 # Company list (preserved from v1)
@@ -883,6 +884,11 @@ def _extract_jd(j, source, cap=None):
         if extra:
             parts.append(extra)
         text = '\n'.join(p for p in parts if p)
+    elif source == 'workday':
+        # Workday's listing API returns no JD; fetch_workday resolves it
+        # separately via the per-job cxs endpoint and stores the result on
+        # j['jd_text']. Honor that here for callers that re-extract.
+        text = j.get('jd_text', '') or ''
     else:
         text = ''
     return text[:cap] if text else ''
@@ -923,6 +929,10 @@ def fetch_ashby(company):
     all_jobs = data.get('jobs', [])
     matches = []
     for j in all_jobs:
+        posted = parse_date(j.get('publishedAt', ''))
+        days = days_ago(posted)
+        if days is not None and days > MAX_JOB_AGE_DAYS:
+            continue
         title = j.get('title', '')
         jd_text = _extract_jd(j, 'ashby')
         is_match, reason, kw = evaluate_role(title, jd_text)
@@ -931,7 +941,6 @@ def fetch_ashby(company):
         location = j.get('location', '') or ''
         if isinstance(location, dict):
             location = location.get('name', '')
-        posted = parse_date(j.get('publishedAt', ''))
         matches.append({
             'company_name': company['name'],
             'role_title': title,
@@ -940,7 +949,7 @@ def fetch_ashby(company):
             'source': 'ashby',
             'date_found': str(datetime.date.today()),
             'posted_date': posted,
-            'days_ago': days_ago(posted),
+            'days_ago': days,
             'location_raw': location,
             'remote_ok': j.get('isRemote', False),
             'company_stage': company.get('stage', 'Unknown'),
@@ -962,6 +971,10 @@ def fetch_greenhouse(company):
     all_jobs = data.get('jobs', [])
     matches = []
     for j in all_jobs:
+        posted = parse_date(j.get('updated_at', '') or j.get('first_published', ''))
+        days = days_ago(posted)
+        if days is not None and days > MAX_JOB_AGE_DAYS:
+            continue
         title = j.get('title', '')
         jd_text = _extract_jd(j, 'greenhouse')
         is_match, reason, kw = evaluate_role(title, jd_text)
@@ -970,7 +983,6 @@ def fetch_greenhouse(company):
         location = j.get('location', {})
         if isinstance(location, dict):
             location = location.get('name', '')
-        posted = parse_date(j.get('updated_at', '') or j.get('first_published', ''))
         matches.append({
             'company_name': company['name'],
             'role_title': title,
@@ -979,7 +991,7 @@ def fetch_greenhouse(company):
             'source': 'greenhouse',
             'date_found': str(datetime.date.today()),
             'posted_date': posted,
-            'days_ago': days_ago(posted),
+            'days_ago': days,
             'location_raw': location,
             'remote_ok': 'remote' in location.lower() if location else False,
             'company_stage': company.get('stage', 'Unknown'),
@@ -992,6 +1004,228 @@ def fetch_greenhouse(company):
         })
     return matches, len(all_jobs)
 
+def _fetch_workday_listing(api_url, page_size=20, max_jobs=1000):
+    """Paginate the Workday cxs jobs listing endpoint. Returns list of postings.
+
+    The first page gets one retry-with-backoff on empty response — running
+    multiple Workday boards back-to-back can trigger transient rate-limiting
+    that returns an empty payload instead of a 429.
+    """
+    import time as _time
+    all_postings = []
+    offset = 0
+    first_page_retries = 1
+    while offset < max_jobs:
+        body = json.dumps({
+            "appliedFacets": {},
+            "limit": page_size,
+            "offset": offset,
+            "searchText": "",
+        }).encode()
+        try:
+            req = urllib.request.Request(
+                api_url,
+                data=body,
+                headers={'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/json'},
+            )
+            with urllib.request.urlopen(req, timeout=10) as r:
+                page = json.loads(r.read().decode())
+        except Exception:
+            break
+        postings = (page or {}).get('jobPostings') or []
+        if not postings:
+            if offset == 0 and first_page_retries > 0:
+                first_page_retries -= 1
+                _time.sleep(2.0)
+                continue
+            break
+        all_postings.extend(postings)
+        if len(postings) < page_size:
+            break
+        offset += page_size
+    return all_postings
+
+
+def _parse_workday_posted_on(s):
+    """Parse Workday's relative postedOn string into days_ago.
+
+    Known forms (case-insensitive):
+        'Posted Today'         -> 0
+        'Posted Yesterday'     -> 1
+        'Posted N Days Ago'    -> N
+        'Posted N+ Days Ago'   -> N (lower bound; 30+ -> 30)
+
+    Returns None for unrecognized formats — callers per project convention
+    keep jobs with no parseable date so we don't lose anything.
+    """
+    if not s:
+        return None
+    t = s.strip().lower()
+    if t == 'posted today':
+        return 0
+    if t == 'posted yesterday':
+        return 1
+    import re as _re
+    m = _re.match(r'^posted\s+(\d+)\+?\s+day(?:s)?\s+ago$', t)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def _fetch_workday_jd_via_api(detail_url):
+    """Single-job detail fetch (no cache). Returns plain-text JD or '' on failure."""
+    try:
+        req = urllib.request.Request(detail_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode())
+    except Exception:
+        return ''
+    info = (data or {}).get('jobPostingInfo') or {}
+    return _strip_html(info.get('jobDescription', '') or '')
+
+
+def _fetch_workday_jds_parallel(candidates, cxs_url, db_conn=None, workers=4):
+    """Resolve JDs for the candidate list. Cache-first; HTTP fallback in parallel.
+
+    Returns a list[str] aligned with candidates. Workers do HTTP only — DB
+    reads happen in the main thread before dispatch, DB writes happen after,
+    so SQLite never sees concurrent access.
+    """
+    n = len(candidates)
+    results = [''] * n
+    if n == 0:
+        return results
+
+    indices_to_fetch = []
+    if db_conn is not None:
+        sys.path.insert(0, SCRIPTS)
+        import storage  # noqa: E402
+        for i, c in enumerate(candidates):
+            cached = storage.get_cached_workday_jd(db_conn, c['_apply_url'])
+            if cached is not None:
+                results[i] = cached
+            else:
+                indices_to_fetch.append(i)
+    else:
+        indices_to_fetch = list(range(n))
+
+    def _http_only(idx):
+        c = candidates[idx]
+        ext = c['_posting'].get('externalPath') or ''
+        if not ext:
+            return idx, ''
+        return idx, _fetch_workday_jd_via_api(cxs_url + ext)
+
+    if indices_to_fetch:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = [ex.submit(_http_only, i) for i in indices_to_fetch]
+            for f in futs:
+                i, jd = f.result()
+                results[i] = jd
+
+    if db_conn is not None and indices_to_fetch:
+        sys.path.insert(0, SCRIPTS)
+        import storage  # noqa: E402
+        for i in indices_to_fetch:
+            jd = results[i]
+            if jd:
+                storage.set_cached_workday_jd(db_conn, candidates[i]['_apply_url'], jd)
+        try:
+            db_conn.commit()
+        except Exception:
+            pass
+
+    return results
+
+
+def fetch_workday(company, db_conn=None):
+    """Fetch + filter jobs from a Workday board.
+
+    Two-stage flow (vs. one-stage for Ashby/GH/Lever, whose listing APIs
+    include JDs inline):
+
+      1. Listing fetch via paginated POST to /wday/cxs/{tenant}/{site}/jobs.
+      2. Drop title-negative rejections (cheap, no extra HTTP).
+      3. Parallel JD fetch for survivors via /wday/cxs/{tenant}/{site}/job{externalPath},
+         with DB-backed cache (workday_job_jds table, 30-day TTL).
+      4. Final evaluate_role(title, jd) — JD-fallback fires for vague titles.
+
+    db_conn enables the JD cache; without it, every call re-fetches JDs over
+    HTTP. Pass the open DB connection from the scan dispatch loop.
+
+    The slug is the compound 'tenant:dc:site' form produced by
+    storage.detect_ats / stored in ats_endpoints.slug.
+    """
+    parts = (company.get('slug') or '').split(':')
+    if len(parts) != 3 or not all(parts):
+        return [], 0
+    tenant, dc, site = parts
+    base_url = f"https://{tenant}.{dc}.myworkdayjobs.com/{site}"
+    cxs_url = f"https://{tenant}.{dc}.myworkdayjobs.com/wday/cxs/{tenant}/{site}"
+    api_url = cxs_url + "/jobs"
+
+    all_postings = _fetch_workday_listing(api_url)
+
+    # Stage 2: cheap pre-filter — drop title-negative AND posted-too-old jobs.
+    # Recency filter applied here (before JD fetch) so we don't waste detail
+    # fetches on stale postings. days_ago is None when postedOn is
+    # unparseable; per project convention we keep those.
+    candidates = []
+    for j in all_postings:
+        days = _parse_workday_posted_on(j.get('postedOn', ''))
+        if days is not None and days > MAX_JOB_AGE_DAYS:
+            continue
+        title = j.get('title', '')
+        _, reason, _ = evaluate_role(title, '')
+        if reason == 'rejected_negative':
+            continue
+        external_path = j.get('externalPath') or ''
+        apply_url = base_url + external_path if external_path else base_url
+        candidates.append({
+            '_posting': j,
+            '_apply_url': apply_url,
+            '_title': title,
+            '_days_ago': days,
+        })
+
+    # Stage 3: JD resolution (cache-first, then parallel HTTP).
+    jds = _fetch_workday_jds_parallel(candidates, cxs_url, db_conn=db_conn)
+
+    # Stage 4: final evaluation with JD context.
+    matches = []
+    for c, jd in zip(candidates, jds):
+        title = c['_title']
+        is_match, reason, kw = evaluate_role(title, jd)
+        if not is_match:
+            continue
+        j = c['_posting']
+        location = j.get('locationsText', '') or ''
+        matches.append({
+            'company_name': company['name'],
+            'role_title': title,
+            'apply_url': c['_apply_url'],
+            'job_url': c['_apply_url'],
+            'source': 'workday',
+            'date_found': str(datetime.date.today()),
+            'posted_date': (
+                str(datetime.date.today() - datetime.timedelta(days=c['_days_ago']))
+                if c['_days_ago'] is not None else ''
+            ),
+            'days_ago': c['_days_ago'],
+            'location_raw': location,
+            'remote_ok': 'remote' in location.lower(),
+            'company_stage': company.get('stage', 'Unknown'),
+            'industry_vertical': company.get('vertical', 'Unknown'),
+            'ai_native': company.get('vertical') == 'AI',
+            'compensation': '',
+            'jd_text': jd[:JD_CAP] if jd else '',
+            'match_reason': reason,
+            'matched_keyword': kw,
+        })
+    return matches, len(all_postings)
+
+
 def fetch_lever(company):
     url = f"https://api.lever.co/v0/postings/{company['slug']}"
     data = fetch_url(url)
@@ -999,13 +1233,6 @@ def fetch_lever(company):
         return [], 0
     matches = []
     for j in data:
-        title = j.get('text', '')
-        jd_text = _extract_jd(j, 'lever')
-        is_match, reason, kw = evaluate_role(title, jd_text)
-        if not is_match:
-            continue
-        cats = j.get('categories', {})
-        location = cats.get('location', '') or ''
         raw_ts = j.get('createdAt', 0)
         posted = ''
         if raw_ts:
@@ -1013,6 +1240,16 @@ def fetch_lever(company):
                 posted = str(datetime.date.fromtimestamp(raw_ts / 1000))
             except Exception:
                 posted = ''
+        days = days_ago(posted)
+        if days is not None and days > MAX_JOB_AGE_DAYS:
+            continue
+        title = j.get('text', '')
+        jd_text = _extract_jd(j, 'lever')
+        is_match, reason, kw = evaluate_role(title, jd_text)
+        if not is_match:
+            continue
+        cats = j.get('categories', {})
+        location = cats.get('location', '') or ''
         matches.append({
             'company_name': company['name'],
             'role_title': title,
@@ -1021,7 +1258,7 @@ def fetch_lever(company):
             'source': 'lever',
             'date_found': str(datetime.date.today()),
             'posted_date': posted,
-            'days_ago': days_ago(posted),
+            'days_ago': days,
             'location_raw': location,
             'remote_ok': 'remote' in location.lower() if location else False,
             'company_stage': company.get('stage', 'Unknown'),
@@ -1053,6 +1290,7 @@ def discover_phase(conn, limit=None, max_age_days=30):
     """
     import time as _time
     import traceback as _tb
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     sys.path.insert(0, SCRIPTS)
     import storage  # noqa: E402
 
@@ -1088,84 +1326,95 @@ def discover_phase(conn, limit=None, max_age_days=30):
     log_path = WORKSPACE + "/discover_phase.log"
     os.makedirs(WORKSPACE, exist_ok=True)
     log_fh = open(log_path, "a")
+
+    # Workers are pure HTTP (no DB, no shared mutable state). The main thread
+    # below is the sole DB writer, so SQLite never sees concurrent access and
+    # no lock is needed — futures act as the serialization queue.
+    def _detect(row):
+        try:
+            result = storage.detect_ats(row["canonical_name"], row["website_url"])
+            return row, result, None
+        except Exception as e:
+            return row, None, (type(e).__name__, str(e), _tb.format_exc())
+        finally:
+            _time.sleep(0.1)
+
     try:
         log_fh.write(
             "\n--- discover_phase start " + datetime.datetime.now().isoformat()
             + " (n=" + str(len(rows)) + ", max_age_days=" + str(max_age_days)
-            + ", limit=" + str(limit) + ") ---\n"
+            + ", limit=" + str(limit) + ", workers=8) ---\n"
         )
         log_fh.flush()
-        for i, row in enumerate(rows, 1):
-            cid = int(row["id"])
-            name = row["canonical_name"]
-            url = row["website_url"]
-            stats["tried"] += 1
-            try:
-                result = storage.detect_ats(name, url)
-            except Exception as e:
-                log_fh.write(
-                    "[" + str(cid) + " " + repr(name) + "] EXCEPTION: "
-                    + type(e).__name__ + ": " + str(e) + "\n" + _tb.format_exc() + "\n"
-                )
-                log_fh.flush()
-                stats["errors"] += 1
-                _time.sleep(0.4)
-                continue
-
-            try:
-                if result and result.get("provider"):
-                    provider = result["provider"]
-                    slug = result["slug"]
-                    total = result.get("total_jobs")
-                    storage.upsert_ats_endpoint(
-                        conn, cid,
-                        provider=provider, slug=slug,
-                        ats_url=storage.ats_url(provider, slug),
-                        status="active",
-                        open_jobs_actual=total if isinstance(total, int) else None,
-                        raw_metadata={"found_via": result.get("found_via", "")},
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futures = [ex.submit(_detect, row) for row in rows]
+            for i, fut in enumerate(as_completed(futures), 1):
+                row, result, err = fut.result()
+                cid = int(row["id"])
+                name = row["canonical_name"]
+                stats["tried"] += 1
+                if err is not None:
+                    log_fh.write(
+                        "[" + str(cid) + " " + repr(name) + "] EXCEPTION: "
+                        + err[0] + ": " + err[1] + "\n" + err[2] + "\n"
                     )
-                    conn.commit()
-                    stats["hits"] += 1
-                    stats["by_provider"][provider] = stats["by_provider"].get(provider, 0) + 1
-                elif result and result.get("dead_url"):
-                    storage.upsert_ats_endpoint(
-                        conn, cid,
-                        provider="broken", slug="_dead_url_" + str(cid),
-                        status="not_found",
-                        open_jobs_actual=0,
-                        raw_metadata={"reason": "dns_nxdomain",
-                                      "tried": result.get("tried_slugs", [])},
-                    )
-                    conn.commit()
-                    stats["dead_urls"] += 1
+                    log_fh.flush()
+                    stats["errors"] += 1
                 else:
-                    storage.upsert_ats_endpoint(
-                        conn, cid,
-                        provider="unknown", slug="_not_found_" + str(cid),
-                        status="not_found",
-                        open_jobs_actual=0,
-                        raw_metadata={"reason": "no_provider_match"},
-                    )
-                    conn.commit()
-                    stats["misses"] += 1
-            except Exception as e:
-                log_fh.write(
-                    "[" + str(cid) + " " + repr(name) + "] DB upsert failed: "
-                    + type(e).__name__ + ": " + str(e) + "\n"
-                )
-                log_fh.flush()
-                stats["errors"] += 1
+                    try:
+                        if result and result.get("provider"):
+                            provider = result["provider"]
+                            slug = result["slug"]
+                            total = result.get("total_jobs")
+                            storage.upsert_ats_endpoint(
+                                conn, cid,
+                                provider=provider, slug=slug,
+                                ats_url=storage.ats_url(provider, slug),
+                                status="active",
+                                open_jobs_actual=total if isinstance(total, int) else None,
+                                raw_metadata={"found_via": result.get("found_via", "")},
+                            )
+                            conn.commit()
+                            stats["hits"] += 1
+                            stats["by_provider"][provider] = stats["by_provider"].get(provider, 0) + 1
+                        elif result and result.get("dead_url"):
+                            storage.upsert_ats_endpoint(
+                                conn, cid,
+                                provider="broken", slug="_dead_url_" + str(cid),
+                                status="not_found",
+                                open_jobs_actual=0,
+                                raw_metadata={"reason": "dns_nxdomain",
+                                              "tried": result.get("tried_slugs", [])},
+                            )
+                            conn.commit()
+                            stats["dead_urls"] += 1
+                        else:
+                            storage.upsert_ats_endpoint(
+                                conn, cid,
+                                provider="unknown", slug="_not_found_" + str(cid),
+                                status="not_found",
+                                open_jobs_actual=0,
+                                raw_metadata={"reason": "no_provider_match"},
+                            )
+                            conn.commit()
+                            stats["misses"] += 1
+                    except Exception as e:
+                        log_fh.write(
+                            "[" + str(cid) + " " + repr(name) + "] DB upsert failed: "
+                            + type(e).__name__ + ": " + str(e) + "\n"
+                        )
+                        log_fh.flush()
+                        stats["errors"] += 1
 
-            if i % 25 == 0:
-                print(
-                    "  [" + str(i) + "/" + str(len(rows)) + "] "
-                    + "hits=" + str(stats["hits"])
-                    + " misses=" + str(stats["misses"])
-                    + " dead=" + str(stats["dead_urls"])
-                    + " err=" + str(stats["errors"])
-                )
-            _time.sleep(0.4)
+                if i % 25 == 0:
+                    print(
+                        "  [" + str(i) + "/" + str(len(rows)) + "] "
+                        + "hits=" + str(stats["hits"])
+                        + " misses=" + str(stats["misses"])
+                        + " dead=" + str(stats["dead_urls"])
+                        + " err=" + str(stats["errors"]),
+                        flush=True,
+                    )
 
         log_fh.write(
             "--- discover_phase end " + datetime.datetime.now().isoformat()
@@ -1248,6 +1497,8 @@ if __name__ == "__main__":
                 matches, total = fetch_greenhouse(company)
             elif ats == 'lever':
                 matches, total = fetch_lever(company)
+            elif ats == 'workday':
+                matches, total = fetch_workday(company, db_conn=db_conn)
             else:
                 company_stats.append({'company': company['name'], 'ats': 'custom', 'total_jobs': 0, 'matches': 0, 'status': 'skipped'})
                 continue

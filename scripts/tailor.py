@@ -14,19 +14,14 @@ PP RESUME UPDATE FRAMEWORK:
 4. Lead with strongest anchor for this role type:
    - Marketplace/ops roles: Urban Company (unit economics, two-sided platform)
    - Consulting-adjacent: Strategy& Dubai (C-suite, M&A, market entry)
-   - AI/product roles: Armor Defense + AI projects (SEC RAG, Spotify MCP)
+   - AI/product roles: Armor Defense + AI projects (comparable-co analysis RAG, Spotify MCP, multi-agent job-app pipeline)
    - GTM/Sales Ops: Accenture B2B marketplace (1.2M launch)
 5. Summary must mirror the JD language back at them
 6. Keep all real metrics - they are the proof
 7. Add AI/technical projects section if role is AI-native
 """
 
-def get_api_key():
-    try:
-        cfg = json.load(open("/root/.openclaw/openclaw.json"))
-        return json.load(open("/root/.openclaw/agents/job-scout/auth-profiles.json")).get("profiles",{}).get("anthropic:default",{}).get("key","")
-    except:
-        return ""
+from keys import get_anthropic_key as get_api_key
 
 def fetch_jd(url):
     try:
@@ -98,7 +93,7 @@ def record_tailored_resume(job_url, role_title, company_name, filename, date_str
     })
     json.dump(tracker, open(tracker_path, "w"), indent=2)
 
-def run(job_url, role_title, company_name):
+def run(job_url, role_title, company_name, comments=""):
     api_key = get_api_key()
     if not api_key:
         print("ERROR: No Anthropic API key")
@@ -110,6 +105,13 @@ def run(job_url, role_title, company_name):
     jd = fetch_jd(job_url)
     print("JD fetched: " + str(len(jd)) + " chars")
 
+    user_guidance_block = ""
+    if comments and comments.strip():
+        user_guidance_block = (
+            "USER GUIDANCE (highest priority — overrides default framing decisions):\n"
+            + comments.strip() + "\n\n"
+        )
+
     prompt = (
         "You are an expert resume tailor for Pratyush Paul, a Strategy and Operations professional.\n\n"
         + FRAMEWORK + "\n\n"
@@ -117,7 +119,8 @@ def run(job_url, role_title, company_name):
         "RESUME LIBRARY (alternative framings by role type - use these as building blocks):\n" + library[:15000] + "\n\n"
         "JOB: " + role_title + " at " + company_name + "\n"
         "JOB DESCRIPTION:\n" + jd + "\n\n"
-        "TASK: Produce a tailored resume. Output ONLY the resume text, no preamble, no markdown.\n"
+        + user_guidance_block
+        + "TASK: Produce a tailored resume. Output ONLY the resume text, no preamble, no markdown.\n"
         "Rules:\n"
         "- Keep all real metrics exactly as stated -- AND keep the context around them (the how and the so what)\n"
         "- Keep 3-4 bullets per role minimum. Never drop below 3\n"
@@ -142,13 +145,13 @@ def run(job_url, role_title, company_name):
         "- Rewrite summary (3-4 lines) to mirror this JD language and needs\n"
         "- Integrate 3-5 keywords from JD naturally into existing bullets\n"
         "- Keep AI/Technical Projects section if company is AI-native\n"
-        "- Flag SQL requirements with [SQL NOTE: required/preferred] at top\n"
         "- Education section must be titled exactly: EDUCATION AND OTHER EXPERIENCES\n"
         "- Section order must always be: 1) SUMMARY 2) CORE EXPERIENCE (chronological, most recent first) 3) AI/TECHNICAL PROJECTS 4) EDUCATION AND OTHER EXPERIENCES\n"
         "- NEVER reorder the companies within CORE EXPERIENCE. Always: Armor Defense first, then Strategy&, then Urban Company, then Accenture\n"
         "- Plain text format, same structure as master resume\n"
+        "- Use ASCII hyphen '-' throughout the document. NEVER use the em-dash '—' or en-dash '–' anywhere in the output (bullets, summary, dates, ranges, separators). If the master or library text contains an em-dash, convert it to a hyphen.\n"
         "- Contact line (line 2) MUST include phone, email, LinkedIn URL, and GitHub URL exactly as in master resume. NEVER drop the GitHub link.\n"
-        "- ONE PAGE total — STRICT. If content overflows, tighten bullets (cut adjectives/filler) before adding anything. Never exceed one page."
+        "- ONE PAGE total - STRICT. If content overflows, tighten bullets (cut adjectives/filler) before adding anything. Never exceed one page."
     )
 
     print("Calling Claude Sonnet...")
@@ -213,7 +216,17 @@ def run(job_url, role_title, company_name):
     return filepath
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Usage: python3 tailor.py <job_url> <role_title> <company_name>")
-        sys.exit(1)
-    run(sys.argv[1], sys.argv[2], sys.argv[3])
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("job_url")
+    ap.add_argument("role_title")
+    ap.add_argument("company_name")
+    ap.add_argument("version", nargs="?", default="")  # legacy positional
+    ap.add_argument("--comments", default="", help="User guidance to inject into the prompt (for Regenerate flow)")
+    args = ap.parse_args()
+    # Reset sys.argv so run()'s legacy 4th-arg version sniffing only sees
+    # the explicit positional version (if any) and not the --comments flag.
+    sys.argv = [sys.argv[0], args.job_url, args.role_title, args.company_name]
+    if args.version:
+        sys.argv.append(args.version)
+    run(args.job_url, args.role_title, args.company_name, comments=args.comments)

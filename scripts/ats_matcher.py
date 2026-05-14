@@ -63,12 +63,7 @@ def _storage():
     return storage
 
 
-def get_deepseek_key():
-    try:
-        cfg = json.load(open('/root/.openclaw/openclaw.json'))
-        return cfg.get('models', {}).get('providers', {}).get('deepseek', {}).get('apiKey', '')
-    except Exception:
-        return ''
+from keys import get_deepseek_key
 
 
 def _load_feedback_settings():
@@ -243,7 +238,7 @@ def _write_shortlist_export(scored_all, total_scanned, score_counts, skip_reason
     keepers.sort(key=lambda j: (
         -j['match_score'],
         0 if j.get('ai_native') else 1,
-        j.get('days_ago', 9999),
+        j['days_ago'] if j.get('days_ago') is not None else 9999,
     ))
     out = {
         'shortlist_date': str(datetime.now().date()),
@@ -326,7 +321,7 @@ PROFILE = (
     "Pratyush Paul - S&O professional, 6+ years. "
     "Background: Strategy& Dubai (consulting), Accenture Singapore (ops transformation), "
     "Urban Company Singapore (two-sided marketplace, unit economics), "
-    "Armor Defense Chicago (cross-functional, built AI projects: SEC RAG + Spotify MCP). "
+    "Armor Defense Chicago (cross-functional, built AI projects: comparable-co analysis RAG + Spotify MCP + multi-agent job-app pipeline). "
     "Target: S&O, CoS, GTM Ops, Sales Ops, Rev Ops, Product Ops, TPM at SaaS/AI startups. "
     "Strong fit: marketplace, AI-native, consulting valued, Series A-D. "
     "Location: all US. SQL: learning, flag as info only never reduce score."
@@ -632,10 +627,22 @@ def main():
         flags = []
         rubric_v = RUBRIC_VERSION
 
-        # Stage 0: manual override
+        # Stage 0: manual override — the manual SCORE wins, but keep the
+        # original match reason (from the prior score row) so the dashboard
+        # card still shows WHY the job matched. The manual score is surfaced
+        # separately in the UI as the "Mine: N/5" badge; it doesn't need to
+        # also hijack the reason line.
         if job_id is not None and job_id in manual_overrides:
             ms, mc = manual_overrides[job_id]
-            score, reason = ms, f"[Manual] {mc}".rstrip()
+            score = ms
+            prior = existing_scores.get(job_id)
+            if prior and prior.get('reason') and not str(prior['reason']).startswith('[Manual]'):
+                reason = prior['reason']
+                flags = prior.get('flags', [])
+            else:
+                # No prior matcher reason to preserve (job manually scored
+                # before it was ever DeepSeek-scored) — fall back to [Manual].
+                reason = f"[Manual] {mc}".rstrip()
             counters['manual'] += 1
 
         # Stage 1: deterministic pre-filter

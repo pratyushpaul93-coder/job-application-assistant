@@ -23,19 +23,14 @@ PROFILE = (
     "Pratyush Paul - S&O professional, 6+ years. "
     "Background: Strategy& Dubai (consulting), Accenture Singapore (ops transformation), "
     "Urban Company Singapore (two-sided marketplace, unit economics), "
-    "Armor Defense Chicago (cross-functional, built AI projects: SEC RAG + Spotify MCP). "
+    "Armor Defense Chicago (cross-functional, built AI projects: comparable-co analysis RAG + Spotify MCP + multi-agent job-app pipeline). "
     "Target: S&O, CoS, GTM Ops, Sales Ops, Rev Ops, Product Ops, TPM at SaaS/AI startups. "
     "Strong fit: marketplace, AI-native, consulting valued, Series A-D. "
     "Location: all US. SQL: learning, flag as info only never reduce score."
 )
 
 
-def get_deepseek_key():
-    try:
-        cfg = json.load(open("/root/.openclaw/openclaw.json"))
-        return cfg.get("models", {}).get("providers", {}).get("deepseek", {}).get("apiKey", "")
-    except Exception:
-        return ""
+from keys import get_deepseek_key
 
 
 def score_job(job, api_key, few_shot_block=""):

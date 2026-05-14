@@ -32,6 +32,9 @@ import sys
 import time
 from pathlib import Path
 
+# Line-buffer stdout so heartbeats are visible live through `tee` (no TTY → block buffer otherwise).
+sys.stdout.reconfigure(line_buffering=True)
+
 # Add scripts/ to path so we can import scout and storage
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
