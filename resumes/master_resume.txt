@@ -7,7 +7,7 @@ Strategy and operations leader with 6+ years of experience driving business grow
 CORE EXPERIENCE
 
 Armor Defense, USA (Remote, Chicago)
-Senior Technical Product Manager | May 2025 - Present
+Senior Technical Product Manager | May 2025 - Dec 2025
 - Led migration of cybersecurity technology platform used by 400+ clients, reached 80% adoption within 3 months while retaining 98% of clients
 - Managed end-to-end initiative to launch container runtime security product, unlocking customer segment projected to generate $2M revenue within first year
 - Analyzed customer tickets to identify operational inefficiencies, implemented system improvements that reduced engineering overhead by 50%
@@ -39,6 +39,6 @@ Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
 Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
 
 AI/TECHNICAL PROJECTS (built during job search)
-- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
-- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
-- OpenClaw Job Hunting Pipeline: Intelligent scraping (SEC form D, VC portfolios) 100's of target companies and automation scanning via ATS APIs, DeepSeek scoring, Flask dashboard
+- SEC filings analysis: comparable company analysis model for public companies - Python, RAG, NumPy vectorstore.
+- Playlist generator: Liked song classifier with 5-tier genre fallback and automatic playlist creation - MCP.
+- Job application assistant: Scrape longlist of target companies, match jobs and tailor resume - ATS API automation, DeepSeek scoring, Flask dashboard.

@@ -1,46 +1,44 @@
 PRATYUSH PAUL
 (312) 678-3629 | pratyushpaul93@gmail.com | linkedin.com/in/pratyushpaul | github.com/pratyushpaul93-coder
 
-[SQL NOTE: required - SQL, python, BI Tools mentioned as required skills]
-
 SUMMARY
-Strategy and operations leader with 6+ years driving partnership strategy, revenue operations, and cross-functional deal execution across North American, Southeast Asian and Middle Eastern markets. Expert in financial modeling, pricing strategy, and building operational frameworks that scale partnership economics. Proven track record translating complex deal structures into clear recommendations and managing cross-functional stakeholders from deal strategy through revenue recognition.
+Operations and strategy leader with 6+ years building scalable business models, driving revenue growth, and executing cross-functional initiatives across North American, Southeast Asian and Middle Eastern markets. Expertise in financial modeling, operational optimization, and translating complex business challenges into actionable strategies. Track record of delivering measurable impact through data-driven decision making and stakeholder alignment.
 
 CORE EXPERIENCE
 
 Armor Defense, USA (Remote, Chicago)
 Senior Technical Product Manager | May 2025 - Present
-- Led migration of cybersecurity technology platform used by 400+ clients, structured deal terms and approval frameworks reaching 80% adoption within 3 months while retaining 98% of clients
-- Owned end-to-end initiative to launch container runtime security product, built financial models analyzing market opportunity and partnership economics to unlock customer segment projected to generate $2M revenue within first year  
-- Analyzed operational workflows across engineering and customer success teams, implemented system improvements that reduced overhead by 50% enabling focus on strategic revenue initiatives
+- Directed migration of cybersecurity platform serving 400+ clients, built implementation roadmap and change management strategy achieving 80% adoption in 3 months while maintaining 98% client retention
+- Owned product launch for container runtime security solution, developed financial models projecting $2M first-year revenue and identified optimal customer segments for market entry
+- Streamlined operational workflows across engineering and customer success, reducing operational overhead by 50% and redirecting resources to high-impact revenue initiatives
 
 Strategy&, Dubai
 Senior Associate | Oct 2022 - Jan 2024
-- Led strategic planning for merger of 2 IoT leaders in KSA, designed deal structure and operating model harmonizing operations and systems, leading to 95% employee retention
-- Owned acquisition target analysis for Telco client, built financial models and scenario analysis to recommend $10M+ targets expanding portfolio by 30% and entering 2 new market segments
-- Built comprehensive governance and reporting systems covering sales performance, deal pipeline health, and strategic initiative tracking, enhancing transparency and accelerating deal execution
-- Synthesized complex market data to generate strategic 5-year revenue projections and financial forecasts for Kuwaiti Telco subsidiary, providing actionable insights for investment decisions
+- Led strategic planning for merger of 2 IoT companies in KSA, designed integrated operating model achieving 95% employee retention post-acquisition
+- Conducted acquisition analysis for Telco client recommending $10M+ targets, enabling portfolio expansion into 2 new market segments and 30% growth in addressable market
+- Developed governance and reporting infrastructure for sales pipeline, deal tracking, and strategic initiative performance, improving organizational transparency and execution velocity
+- Generated 5-year financial projections and scenario analysis for Kuwaiti Telco subsidiary, delivering strategic insights that informed $50M+ capital investment decisions
 
 Urban Company, Singapore
 Strategy and Operations Manager | Jan 2022 - Aug 2022
-- Built and led 2-person team driving operational improvements for largest service category, implemented data-driven initiatives resulting in 25% increase in monthly orders, 15-point NPS rise to 45, and 10% boost in provider ratings
-- Led strategic initiative to re-launch service category, designed operational frameworks for pricing strategy, quality metrics and hyperlocal acquisition to achieve target unit economics
-- Analyzed customer and provider satisfaction data to identify improvement opportunities, implemented targeted interventions increasing provider earnings 15% and customer retention 25%
-- Optimized agency partnerships through structured deal terms and performance metrics, delivering 10% cost reduction and 15% improvement in service quality
+- Built and led 2-person team executing operational improvements for largest service category, implementing data-driven initiatives that increased monthly orders by 25%, raised NPS 15 points to 45, and improved provider ratings by 10%
+- Designed operational framework for service category relaunch, establishing pricing strategy, quality standards, and hyperlocal acquisition plan to achieve target unit economics
+- Analyzed customer and provider data to drive targeted improvements, increasing provider earnings by 15% and improving customer retention by 25%
+- Optimized agency partnerships through performance metrics, reducing costs by 10% while improving service quality by 15%
 
 Accenture, Singapore
 Management Consultant | Mar 2018 - Dec 2021
-- Designed and implemented B2B marketplace launch strategy including competitor analysis, pricing frameworks, and operational workflows, generating $1.2M in sales across Southeast Asian markets within first 3 months
-- Built demand forecasting model for global shipping giant to optimize container allocation across 300+ ports worldwide, improving forecasting efficiency by 1% and generating ~$4M in annual savings
-- Directed team of 4 analysts conducting comprehensive market research and pricing analysis, delivered recommendations driving 20% ROI increase for big tech APAC headquarters
-- Managed $5M strategic initiative for gaming client, led cross-functional collaboration aligning business requirements with technical solutions driving operational excellence
+- Launched B2B marketplace across Southeast Asia with go-to-market strategy, competitive positioning, and operational roadmap generating $1.2M in sales within first 3 months
+- Built demand forecasting model for global shipping company optimizing container allocation across 300+ ports, improving forecasting efficiency by 1% and delivering $4M in annual savings
+- Led team of 4 analysts on market research and pricing strategy for big tech APAC division, driving 20% ROI improvement
+- Managed $5M strategic initiative for gaming client, aligning business requirements with technical implementation across multiple departments
 
 AI/TECHNICAL PROJECTS
-- SEC EDGAR RAG System: Financial disclosure analysis for public companies — Python, sentence-transformers, Claude Haiku. Custom numpy vectorstore. GitHub: pp-market-intelligence
-- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation. GitHub: pp-spotify-genre-classifer_playlist-creator
-- OpenClaw Job Hunting Pipeline: Intelligent scraping (SEC form D, VC portfolios) 100's of target companies with ATS automation, DeepSeek scoring, Flask dashboard
+- SEC EDGAR RAG System: Financial disclosure analysis for public companies using Python, sentence-transformers, Claude Sonnet, and custom numpy vectorstore
+- Spotify MCP Server: Liked song classifier with 5-tier genre fallback and automatic playlist creation
+- Job Application Assistant: Multi-agent pipeline (Python/Flask) using DeepSeek for relevance scoring and Claude Sonnet for resume tailoring; reverse-engineered Getro APIs to source thousands of companies across VC portfolios
 
 EDUCATION AND OTHER EXPERIENCES
 National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
 Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
-Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
+Singapore Civil Defence Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014
