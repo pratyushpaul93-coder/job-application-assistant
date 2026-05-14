@@ -1,0 +1,181 @@
+## Pratyush Paul outreach kit — voice blocks, openers, CTAs, slants.
+## The drafter loads this file verbatim and shows it to the LLM.
+## Edit phrasing here to update voice across all future drafts.
+
+name: "Pratyush Paul"
+
+# Use these as-is. Most drafts use `applied_short`. The other two are situational.
+openers:
+  - id: applied_short
+    text: "I recently applied for the {role} role on your team and wanted to send a quick note."
+    when: "default — short and direct"
+  - id: applied_research
+    text: "Last week I applied to an open {role} role at {company}. Came across your profile while researching leaders of the team and wanted to supplement my application with a note."
+    when: "when reaching out to a specific researched leader"
+  - id: saw_listing
+    text: "My name is Pratyush Paul and I saw that you're looking for a {role} to join your team. Just threw my hat in the ring and wanted to send you a note."
+    when: "alternate — slightly warmer intro"
+
+# About-me building blocks. Lead phrasing is the SUGGESTED voice; paraphrase
+# freely to fit word-count and rhythm. The block IDENTITY matters (consulting
+# vs marketplace vs builder); the exact wording is a guidepost not a script.
+blocks:
+  consulting:
+    text: "I spent several years at Strategy& and Accenture across the Middle East and Southeast Asia, helping companies find and execute growth levers."
+    tags: [consulting, strategy, foundational]
+    use_when: "always — Pratyush's foundational experience"
+
+  consulting_with_industries:
+    text: "I spent several years at Strategy& and Accenture across the Middle East and Southeast Asia helping telco, tech, and FMCG companies find and execute growth levers."
+    tags: [consulting, strategy, foundational]
+    use_when: "swap for `consulting` when the company is in telco/tech/FMCG/consumer"
+
+  marketplace:
+    text: "I also ran marketplace operations at Urban Company in Singapore — launching new categories and scaling supply-side systems across a two-sided platform."
+    tags: [marketplace, ops, two_sided, supply_side, operator]
+    use_when: "marketplace, two-sided, supply-side, GTM, ops, partnerships, commercial-ops roles"
+
+  marketplace_shorter:
+    text: "I also ran marketplace ops at Urban Company (on-demand home services) in Singapore, where I launched new categories and built the supply-side systems supporting them."
+    tags: [marketplace, ops]
+    use_when: "tighter alternative to `marketplace` when you want a 4-block paragraph"
+
+  consulting_marketplace_merged:
+    text: "I'm an ex-Strategy& and Accenture consultant turned marketplace operator (Urban Company, Singapore)."
+    tags: [consulting, marketplace, collapsed_bio]
+    use_when: "TIGHT slant — collapses two background blocks into one line when targeting ~100-115 word drafts"
+
+  tpm_cyber:
+    text: "Most recently, technical PM work at a cybersecurity company."
+    tags: [tpm, product, technical, security]
+    use_when: "product / TPM roles, or when company is in security / infra / dev tools"
+
+  through_line_operator:
+    text: "The through-line has been operator work — owning ambiguous cross-functional problems end to end, then building the cadences and dashboards so they don't break when I hand them off."
+    tags: [operator, framing, biz_ops]
+    use_when: "BizOps, Strategy & Ops, Chief of Staff, Founding-X roles in drafts ≥200 words. SKIP below 150 words — the bio blocks already imply operator work."
+
+  llm_builder:
+    text: "This year I've been deep on LLMs — building real things (a multi agent job-app pipeline on a VPS, a RAG enabled comparable company analysis model, a Spotify MCP server) for the operator instincts on where AI actually changes the work versus where it's hype. For a Biz Ops role at an AI-native company, that fluency compounds."
+    tags: [llm, ai, builder]
+    use_when: "AI-native or AI-forward company (foundation models, AI applications, AI infra). Adapt the role descriptor ('Biz Ops' / 'product ops' / 'S&O') based on the actual role."
+
+  llm_builder_compact:
+    text: "This year I've been deep on LLMs — building real things (a multi agent job-app pipeline, a RAG enabled comparable company analysis model, a Spotify MCP server) for operator instincts on where AI actually changes the work."
+    tags: [llm, ai, builder, compact]
+    use_when: "Tight word-count variant of `llm_builder`. Drops the fluency-compounds tagline."
+
+  nus_econ_cross_region:
+    text: "I graduated with a degree in Economics from the National University of Singapore and have enjoyed assimilating into different regions of the world."
+    tags: [education, softer, cultural]
+    use_when: "softer cultural-fit angle for warmer outreach to senior leaders. Drop for AI-native or hard-edged ops roles."
+
+  partnerships_detail:
+    text: "Through these experiences, I have been responsible for building and managing partnerships with clients, internal stakeholders and other 3rd parties during transactions and complex initiatives like market entry and post merger integrations."
+    tags: [partnerships, bd, stakeholders]
+    use_when: "partnerships, BD, alliances, strategic-partnerships roles"
+
+  growth_levers_detail:
+    text: "I have helped launch new marketplace businesses and routes to market for FMCG companies, come up with demand forecasting and performance tracking systems (sales execution, marketing funnel, build velocity, etc.) as well as run strategic initiatives like business planning and post merger integrations."
+    tags: [growth, gtm, planning, deep_detail]
+    use_when: "strategy, GTM, ops-senior roles where you want a denser detail block"
+
+# Optional connective tissue between about-me and why-company.
+bridges:
+  - id: next_phase_mission
+    text: "In the next phase of my career, I am looking for a meaningful mission to get behind."
+    when: "default bridge — drop in drafts ≤130 words"
+
+ctas:
+  - id: chat_15
+    text: "Would you be open to a 15-min chat to see if I'm a fit?"
+    when: "default — short, low-friction"
+  - id: chat_20
+    text: "Would you have 20 mins for a call to discuss how I could contribute?"
+    when: "slightly warmer / more substantive"
+  - id: coffee
+    text: "Could I interest you in a quick coffee chat to discuss how I could contribute?"
+    when: "for senior leaders, or warmer when the recipient is likely SF/NYC based"
+
+signoffs:
+  - "Regards,"
+  - "Warm regards,"
+
+ps_options:
+  - id: redirect
+    text: "P.S. I would sincerely appreciate a redirect in case the role is too junior/doesn't roll up to you!"
+    when: "rare — only for cold outreach to senior leaders you're not sure are the hiring manager. Skip in drafts ≤150 words."
+
+subject:
+  template: "Pratyush Paul | {credential} — {action}"
+  credential_examples:
+    - "Ex-Strategy& consultant, marketplace ops"
+    - "Strategy&, marketplace ops, LLM builder"
+    - "Strategy&, cybersecurity TPM"
+    - "Two-sided marketplace ops + consulting"
+  action_examples:
+    - "applied for Biz Ops role"
+    - "applied for Sr Biz Ops role"
+    - "applied for S&O Lead"
+    - "interested in Product Ops @ {company}"
+    - "quick intro"
+
+# ── Slants ────────────────────────────────────────────────────────────
+# Each generation produces 2 variants chosen by the orchestrator from these 5.
+# Auto-selection biases toward role-fit and (eventually) past-performance priors.
+slants:
+  operator:
+    label: "Operator"
+    lead_identity: "marketplace operator + consultant"
+    blocks_preferred: [consulting, marketplace, llm_builder_compact]
+    why_structure: "smooth prose, name the operational mechanic"
+    word_target: 120
+    use_when: "BizOps / S&O / Chief of Staff / operator-shaped roles at consumer, marketplace, or two-sided companies"
+
+  builder:
+    label: "Builder"
+    lead_identity: "LLM builder with consulting+ops base"
+    blocks_preferred: [consulting, llm_builder]
+    why_structure: "thesis-first, then customer-mix evidence"
+    word_target: 115
+    use_when: "AI-native companies (foundation models, AI applications, AI infra) — emphasizes the LLM-fluency signal"
+
+  analyst:
+    label: "Analyst"
+    lead_identity: "Strategy& consultant"
+    blocks_preferred: [consulting_with_industries, growth_levers_detail]
+    why_structure: "McKinsey-style thesis with explicit business mechanic"
+    word_target: 125
+    use_when: "Strategy / Strategic Finance / Corp Dev roles, or companies that value the consulting credential heavily (fintech, regulated, enterprise)"
+
+  tight:
+    label: "Tight"
+    lead_identity: "collapsed bio one-liner"
+    blocks_preferred: [consulting_marketplace_merged, llm_builder_compact]
+    why_structure: "single-punch fact-list, no thesis"
+    word_target: 105
+    use_when: "always a valid second variant — proves the message can land at minimum viable length. Pair with Operator/Builder/Analyst."
+
+  warm:
+    label: "Warm"
+    lead_identity: "generalist with cultural-fit angle"
+    blocks_preferred: [consulting, marketplace_shorter, nus_econ_cross_region]
+    why_structure: "softer prose, acknowledge mission alignment"
+    word_target: 120
+    use_when: "senior leaders, mission-driven companies (healthcare, climate, social impact), or where research suggests a culture-fit-heavy hiring style"
+
+# Default slant pairing if the orchestrator can't infer from the role.
+default_slants: [builder, tight]
+
+# ── Voice rules (these flow into the system prompt) ──────────────────
+voice_rules:
+  - "Direct and specific. No fluff, no thirsty enthusiasm."
+  - "Avoid generic praise like 'technically elite team' — always anchor to a concrete business mechanic, a recent move, or a named product/moat."
+  - "The why-this-company paragraph must name at least one specific fact (funding, product launch, integration, customer segment, market dynamic) drawn from the cached company research."
+  - "ASCII punctuation ONLY. NEVER use em-dash (—) or en-dash (–) anywhere in subject or body. If you would naturally reach for an em-dash for a clause break or emphasis, use a comma, parentheses, a colon, or a period instead. The ASCII hyphen (-) is fine for compound words and ranges."
+  - "BODY HARD CAP: 145 words. The slant's word_target (105-125) is the goal. Exceeding 145 makes the draft unusable. Going under target is fine. Returning a body that counts to >145 words wastes the call."
+  - "Leave 'Hey [Name],' as the greeting placeholder — Pratyush fills in the name himself after researching the recipient."
+  - "Exclamation points: zero in the main body. Allowed in P.S. or in a genuine acknowledgment of a milestone (e.g. '(congratulations on the Series D!)') — at most ONE such exclamation per draft."
+  - "Block phrasing is a GUIDEPOST not a script. Paraphrase to hit word count and rhythm, but keep the block's identity (consulting / marketplace / builder / partnerships)."
+  - "Abbreviate 'Business Operations' as 'Biz Ops' in the body and subject line. But preserve role titles verbatim when they appear: 'Senior Business Operations Manager' stays as 'Senior Business Operations Manager' in the opener that names the role you applied for."
+  - "Subject lines never abbreviate Pratyush's first name. Always 'Pratyush Paul | ...'."
