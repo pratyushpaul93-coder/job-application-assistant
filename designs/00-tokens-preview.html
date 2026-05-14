@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>pp-jobapp · design tokens preview</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { padding: var(--s-8) var(--s-6); }
+  .container { max-width: 980px; margin: 0 auto; }
+  .doc-header { margin-bottom: var(--s-10); }
+  .doc-header h1 { font-size: var(--fs-3xl); margin-bottom: var(--s-2); letter-spacing: -0.02em; }
+  .doc-header p { color: var(--c-text-2); font-size: var(--fs-md); max-width: 60ch; line-height: 1.6; }
+  .section { margin-bottom: var(--s-10); }
+  .section__title {
+    font-size: var(--fs-xs);
+    color: var(--c-text-3);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    font-weight: var(--fw-semibold);
+    margin-bottom: var(--s-4);
+    padding-bottom: var(--s-2);
+    border-bottom: 1px solid var(--c-border);
+  }
+  .grid { display: grid; gap: var(--s-3); }
+  .grid--swatches { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .grid--tokens   { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .swatch {
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    background: var(--c-surface);
+  }
+  .swatch__chip { height: 64px; }
+  .swatch__meta { padding: var(--s-2) var(--s-3); font-size: var(--fs-xs); }
+  .swatch__name { font-weight: var(--fw-medium); color: var(--c-text); }
+  .swatch__value { color: var(--c-text-3); font-family: var(--font-mono); margin-top: 2px; }
+  .swatch--lite .swatch__chip { border-bottom: 1px solid var(--c-border); }
+  .type-row {
+    display: flex; align-items: baseline; gap: var(--s-4);
+    padding: var(--s-3) 0; border-bottom: 1px solid var(--c-border);
+  }
+  .type-row:last-child { border-bottom: none; }
+  .type-row__label { width: 80px; color: var(--c-text-3); font-size: var(--fs-xs); font-family: var(--font-mono); }
+  .type-row__sample { flex: 1; }
+  .space-row {
+    display: flex; align-items: center; gap: var(--s-4);
+    padding: var(--s-2) 0;
+  }
+  .space-row__label { width: 60px; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--c-text-3); }
+  .space-row__bar { background: var(--c-accent); height: 12px; border-radius: var(--r-sm); }
+  .demo {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    padding: var(--s-5);
+    box-shadow: var(--sh-1);
+  }
+  .demo + .demo { margin-top: var(--s-3); }
+  .demo__label {
+    font-size: var(--fs-xs); color: var(--c-text-3);
+    text-transform: uppercase; letter-spacing: var(--tracking-wide);
+    margin-bottom: var(--s-3);
+    font-weight: var(--fw-medium);
+  }
+  .state-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--s-3) var(--s-4);
+    align-items: center;
+  }
+  .state-grid__header {
+    font-size: var(--fs-xs); color: var(--c-text-3);
+    text-transform: uppercase; letter-spacing: var(--tracking-wide);
+    font-weight: var(--fw-medium);
+  }
+  .state-grid__row-label {
+    font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--c-text-2);
+  }
+  .radii-row, .shadow-row {
+    display: flex; gap: var(--s-4); align-items: center; flex-wrap: wrap;
+  }
+  .radii-box {
+    width: 64px; height: 64px;
+    background: var(--c-accent-soft);
+    border: 1px solid var(--c-accent);
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 4px;
+    font-family: var(--font-mono); font-size: 10px; color: var(--c-accent-text);
+  }
+  .shadow-box {
+    width: 96px; height: 64px; background: var(--c-surface);
+    border-radius: var(--r-md);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 10px; color: var(--c-text-2);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="doc-header">
+    <h1>Design tokens</h1>
+    <p>The foundation layer for the pp-jobapp dashboard redesign. Linear/Vercel-leaning — single indigo accent, generous whitespace, restrained motion. Every screen mockup in this folder consumes these tokens via <code>tokens.css</code>.</p>
+  </header>
+
+  <!-- ============ NEUTRALS ============ -->
+  <section class="section">
+    <h2 class="section__title">Neutrals</h2>
+    <div class="grid grid--swatches">
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-bg)"></div><div class="swatch__meta"><div class="swatch__name">bg</div><div class="swatch__value">#fafafa</div></div></div>
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-surface)"></div><div class="swatch__meta"><div class="swatch__name">surface</div><div class="swatch__value">#ffffff</div></div></div>
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-surface-2)"></div><div class="swatch__meta"><div class="swatch__name">surface-2</div><div class="swatch__value">#f4f4f5</div></div></div>
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-border)"></div><div class="swatch__meta"><div class="swatch__name">border</div><div class="swatch__value">#e4e4e7</div></div></div>
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-border-strong)"></div><div class="swatch__meta"><div class="swatch__name">border-strong</div><div class="swatch__value">#d4d4d8</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-text-3)"></div><div class="swatch__meta"><div class="swatch__name">text-3</div><div class="swatch__value">#a1a1aa</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-text-2)"></div><div class="swatch__meta"><div class="swatch__name">text-2</div><div class="swatch__value">#52525b</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-text)"></div><div class="swatch__meta"><div class="swatch__name">text</div><div class="swatch__value">#09090b</div></div></div>
+    </div>
+  </section>
+
+  <!-- ============ ACCENT ============ -->
+  <section class="section">
+    <h2 class="section__title">Accent · indigo</h2>
+    <div class="grid grid--swatches">
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-accent-soft)"></div><div class="swatch__meta"><div class="swatch__name">accent-soft</div><div class="swatch__value">#eeeefc</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-accent)"></div><div class="swatch__meta"><div class="swatch__name">accent</div><div class="swatch__value">#5b5bd6</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-accent-hover)"></div><div class="swatch__meta"><div class="swatch__name">accent-hover</div><div class="swatch__value">#4f4fc4</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-accent-active)"></div><div class="swatch__meta"><div class="swatch__name">accent-active</div><div class="swatch__value">#4242b0</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-accent-text)"></div><div class="swatch__meta"><div class="swatch__name">accent-text</div><div class="swatch__value">#3838a8</div></div></div>
+    </div>
+  </section>
+
+  <!-- ============ SEMANTIC ============ -->
+  <section class="section">
+    <h2 class="section__title">Semantic</h2>
+    <div class="grid grid--swatches">
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-success-soft)"></div><div class="swatch__meta"><div class="swatch__name">success-soft</div><div class="swatch__value">#ecfdf5</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-success)"></div><div class="swatch__meta"><div class="swatch__name">success</div><div class="swatch__value">#16a34a</div></div></div>
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-warn-soft)"></div><div class="swatch__meta"><div class="swatch__name">warn-soft</div><div class="swatch__value">#fffbeb</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-warn)"></div><div class="swatch__meta"><div class="swatch__name">warn</div><div class="swatch__value">#d97706</div></div></div>
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-danger-soft)"></div><div class="swatch__meta"><div class="swatch__name">danger-soft</div><div class="swatch__value">#fef2f2</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-danger)"></div><div class="swatch__meta"><div class="swatch__name">danger</div><div class="swatch__value">#dc2626</div></div></div>
+      <div class="swatch swatch--lite"><div class="swatch__chip" style="background:var(--c-info-soft)"></div><div class="swatch__meta"><div class="swatch__name">info-soft</div><div class="swatch__value">#eff6ff</div></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:var(--c-info)"></div><div class="swatch__meta"><div class="swatch__name">info</div><div class="swatch__value">#2563eb</div></div></div>
+    </div>
+  </section>
+
+  <!-- ============ TYPE ============ -->
+  <section class="section">
+    <h2 class="section__title">Typography · Inter</h2>
+    <div class="demo">
+      <div class="type-row"><div class="type-row__label">3xl · 36</div><div class="type-row__sample" style="font-size:var(--fs-3xl);font-weight:var(--fw-semibold);letter-spacing:-0.02em">Build pipeline</div></div>
+      <div class="type-row"><div class="type-row__label">2xl · 28</div><div class="type-row__sample" style="font-size:var(--fs-2xl);font-weight:var(--fw-semibold);letter-spacing:-0.01em">Matching jobs · 124 results</div></div>
+      <div class="type-row"><div class="type-row__label">xl · 20</div><div class="type-row__sample" style="font-size:var(--fs-xl);font-weight:var(--fw-semibold)">Senior Business Operations Manager</div></div>
+      <div class="type-row"><div class="type-row__label">lg · 16</div><div class="type-row__sample" style="font-size:var(--fs-lg)">Snorkel AI · San Francisco, CA · Remote OK</div></div>
+      <div class="type-row"><div class="type-row__label">md · 14</div><div class="type-row__sample" style="font-size:var(--fs-md)">Posted 2 days ago · matched 4/5 on rubric · 3 tailored variants</div></div>
+      <div class="type-row"><div class="type-row__label">base · 13</div><div class="type-row__sample" style="font-size:var(--fs-base)">Default body text. Used for cards, tables, and most readable surfaces.</div></div>
+      <div class="type-row"><div class="type-row__label">sm · 12</div><div class="type-row__sample" style="font-size:var(--fs-sm);color:var(--c-text-2)">Secondary meta · sort labels · button text</div></div>
+      <div class="type-row"><div class="type-row__label">xs · 11</div><div class="type-row__sample" style="font-size:var(--fs-xs);color:var(--c-text-3);text-transform:uppercase;letter-spacing:var(--tracking-wide)">Section eyebrow / table headers</div></div>
+    </div>
+  </section>
+
+  <!-- ============ SPACING ============ -->
+  <section class="section">
+    <h2 class="section__title">Spacing · 4px grid</h2>
+    <div class="demo">
+      <div class="space-row"><div class="space-row__label">--s-1</div><div class="space-row__bar" style="width:4px"></div><span class="muted" style="font-size:var(--fs-xs)">4px · hairline gap</span></div>
+      <div class="space-row"><div class="space-row__label">--s-2</div><div class="space-row__bar" style="width:8px"></div><span class="muted" style="font-size:var(--fs-xs)">8px · icon-to-text</span></div>
+      <div class="space-row"><div class="space-row__label">--s-3</div><div class="space-row__bar" style="width:12px"></div><span class="muted" style="font-size:var(--fs-xs)">12px · inline groups</span></div>
+      <div class="space-row"><div class="space-row__label">--s-4</div><div class="space-row__bar" style="width:16px"></div><span class="muted" style="font-size:var(--fs-xs)">16px · card padding</span></div>
+      <div class="space-row"><div class="space-row__label">--s-5</div><div class="space-row__bar" style="width:20px"></div><span class="muted" style="font-size:var(--fs-xs)">20px · panel padding</span></div>
+      <div class="space-row"><div class="space-row__label">--s-6</div><div class="space-row__bar" style="width:24px"></div><span class="muted" style="font-size:var(--fs-xs)">24px · section gutter</span></div>
+      <div class="space-row"><div class="space-row__label">--s-8</div><div class="space-row__bar" style="width:32px"></div><span class="muted" style="font-size:var(--fs-xs)">32px · between sections</span></div>
+      <div class="space-row"><div class="space-row__label">--s-10</div><div class="space-row__bar" style="width:40px"></div><span class="muted" style="font-size:var(--fs-xs)">40px · page rhythm</span></div>
+    </div>
+  </section>
+
+  <!-- ============ RADII & SHADOWS ============ -->
+  <section class="section">
+    <h2 class="section__title">Radii &amp; shadows</h2>
+    <div class="demo">
+      <div class="demo__label">radius</div>
+      <div class="radii-row">
+        <div class="radii-box" style="border-radius:var(--r-sm)">sm · 6</div>
+        <div class="radii-box" style="border-radius:var(--r-md)">md · 8</div>
+        <div class="radii-box" style="border-radius:var(--r-lg)">lg · 12</div>
+        <div class="radii-box" style="border-radius:var(--r-xl)">xl · 16</div>
+        <div class="radii-box" style="border-radius:var(--r-pill);padding:0 18px;width:auto;height:36px">pill</div>
+      </div>
+    </div>
+    <div class="demo">
+      <div class="demo__label">shadow</div>
+      <div class="shadow-row">
+        <div class="shadow-box" style="box-shadow:var(--sh-1)">sh-1</div>
+        <div class="shadow-box" style="box-shadow:var(--sh-2)">sh-2</div>
+        <div class="shadow-box" style="box-shadow:var(--sh-3)">sh-3</div>
+        <div class="shadow-box" style="box-shadow:var(--sh-focus);border:1px solid var(--c-accent)">focus</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BUTTONS ============ -->
+  <section class="section">
+    <h2 class="section__title">Buttons · state matrix</h2>
+    <div class="demo">
+      <div class="state-grid">
+        <div></div>
+        <div class="state-grid__header">Default</div>
+        <div class="state-grid__header">Hover</div>
+        <div class="state-grid__header">Focus</div>
+        <div class="state-grid__header">Loading</div>
+        <div class="state-grid__header">Disabled</div>
+
+        <div class="state-grid__row-label">Primary</div>
+        <div><button class="btn btn--primary">Tailor resume</button></div>
+        <div><button class="btn btn--primary" style="background:var(--c-accent-hover);border-color:var(--c-accent-hover)">Tailor resume</button></div>
+        <div><button class="btn btn--primary" style="box-shadow:var(--sh-focus)">Tailor resume</button></div>
+        <div><button class="btn btn--primary is-loading">Tailor resume</button></div>
+        <div><button class="btn btn--primary" disabled>Tailor resume</button></div>
+
+        <div class="state-grid__row-label">Secondary</div>
+        <div><button class="btn">Generate PDF</button></div>
+        <div><button class="btn" style="background:var(--c-surface-2);border-color:var(--c-border-strong)">Generate PDF</button></div>
+        <div><button class="btn" style="box-shadow:var(--sh-focus);border-color:var(--c-accent)">Generate PDF</button></div>
+        <div><button class="btn is-loading">Generate PDF</button></div>
+        <div><button class="btn" disabled>Generate PDF</button></div>
+
+        <div class="state-grid__row-label">Ghost</div>
+        <div><button class="btn btn--ghost">Cancel</button></div>
+        <div><button class="btn btn--ghost" style="background:var(--c-surface-2);color:var(--c-text)">Cancel</button></div>
+        <div><button class="btn btn--ghost" style="box-shadow:var(--sh-focus);border-color:var(--c-accent)">Cancel</button></div>
+        <div><button class="btn btn--ghost is-loading">Cancel</button></div>
+        <div><button class="btn btn--ghost" disabled>Cancel</button></div>
+
+        <div class="state-grid__row-label">Danger</div>
+        <div><button class="btn btn--danger">Delete</button></div>
+        <div><button class="btn btn--danger" style="background:var(--c-danger-soft);border-color:var(--c-danger)">Delete</button></div>
+        <div><button class="btn btn--danger" style="box-shadow:var(--sh-focus-danger);border-color:var(--c-danger)">Delete</button></div>
+        <div><button class="btn btn--danger is-loading">Delete</button></div>
+        <div><button class="btn btn--danger" disabled>Delete</button></div>
+      </div>
+    </div>
+
+    <div class="demo">
+      <div class="demo__label">sizes</div>
+      <div class="row">
+        <button class="btn btn--sm">Small</button>
+        <button class="btn">Default</button>
+        <button class="btn btn--lg btn--primary">Large primary</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PILLS / SEGMENT ============ -->
+  <section class="section">
+    <h2 class="section__title">Filters · pills &amp; segmented</h2>
+    <div class="demo">
+      <div class="demo__label">filter pills</div>
+      <div class="row row--wrap">
+        <button class="pill is-active">All <span class="count">124</span></button>
+        <button class="pill">Posted &lt;14d <span class="count">38</span></button>
+        <button class="pill">Tailored <span class="count">12</span></button>
+        <button class="pill">VC-backed <span class="count">71</span></button>
+        <button class="pill">Remote OK <span class="count">52</span></button>
+      </div>
+    </div>
+    <div class="demo">
+      <div class="demo__label">segmented (sort)</div>
+      <div class="segment">
+        <button class="segment__btn is-active">Score</button>
+        <button class="segment__btn">Most recent</button>
+        <button class="segment__btn">Company A–Z</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BADGES ============ -->
+  <section class="section">
+    <h2 class="section__title">Badges</h2>
+    <div class="demo">
+      <div class="row row--wrap" style="gap:var(--s-2)">
+        <span class="badge badge--accent">Score 5</span>
+        <span class="badge badge--info">Score 4</span>
+        <span class="badge badge--neutral">Score 3</span>
+        <span class="badge badge--success"><span class="dot"></span>Tailored</span>
+        <span class="badge badge--warn">Posted ~2w</span>
+        <span class="badge badge--danger">Stale 60d+</span>
+        <span class="badge badge--vc">Backed · Sequoia</span>
+        <span class="badge badge--neutral">ATS · Greenhouse</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INPUTS ============ -->
+  <section class="section">
+    <h2 class="section__title">Inputs</h2>
+    <div class="demo">
+      <div class="row" style="gap:var(--s-3);flex-wrap:wrap">
+        <div style="flex:1 1 240px">
+          <input class="input" placeholder="Search role or company…">
+        </div>
+        <div style="flex:1 1 240px">
+          <input class="input" value="Snorkel AI" style="border-color:var(--c-accent);box-shadow:var(--sh-focus)">
+        </div>
+        <div style="flex:1 1 240px">
+          <input class="input" disabled placeholder="Disabled">
+        </div>
+      </div>
+      <div style="margin-top:var(--s-3)">
+        <textarea class="textarea" placeholder="Add a comment for the AI tailor…"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SKELETON ============ -->
+  <section class="section">
+    <h2 class="section__title">Loading · skeleton</h2>
+    <div class="demo">
+      <div class="stack">
+        <span class="skeleton" style="width:60%; height:14px"></span>
+        <span class="skeleton" style="width:40%; height:11px"></span>
+        <span class="skeleton" style="width:80%; height:11px"></span>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

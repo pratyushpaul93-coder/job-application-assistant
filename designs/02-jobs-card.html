@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>pp-jobapp · job card · state matrix</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { padding: var(--s-8) var(--s-6) var(--s-12); }
+  .container { max-width: 880px; margin: 0 auto; }
+  .doc-header { margin-bottom: var(--s-8); }
+  .doc-header h1 { font-size: var(--fs-2xl); letter-spacing: -0.02em; margin-bottom: var(--s-2); }
+  .doc-header p { color: var(--c-text-2); }
+  .state-label {
+    font-size: var(--fs-xs); color: var(--c-text-3);
+    text-transform: uppercase; letter-spacing: var(--tracking-wide);
+    font-weight: var(--fw-medium);
+    margin: var(--s-8) 0 var(--s-3);
+  }
+  .state-label:first-of-type { margin-top: 0; }
+
+  /* =============================================================
+     JOB CARD
+     ============================================================= */
+  .jcard {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-1);
+    padding: var(--s-4) var(--s-5);
+    transition: box-shadow var(--t-fast), border-color var(--t-fast);
+    position: relative;
+  }
+  .jcard:hover { box-shadow: var(--sh-2); border-color: var(--c-border-strong); }
+  .jcard.is-selected {
+    box-shadow: inset 0 0 0 2px var(--c-accent), var(--sh-2);
+    border-color: transparent;
+    background: linear-gradient(0deg, rgba(91,91,214,0.02), rgba(91,91,214,0.02)), var(--c-surface);
+  }
+  .jcard.is-tailored::before {
+    content: '';
+    position: absolute; top: var(--s-2); left: 0; bottom: var(--s-2);
+    width: 3px; background: var(--c-accent); border-radius: 0 2px 2px 0;
+  }
+
+  /* --- Top row --- */
+  .jcard__top {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    gap: var(--s-3);
+    align-items: start;
+  }
+  .jcard__check {
+    width: 20px; height: 20px;
+    border: 1.5px solid var(--c-border-strong);
+    border-radius: 5px;
+    background: var(--c-surface);
+    cursor: pointer;
+    transition: all var(--t-fast);
+    display: flex; align-items: center; justify-content: center;
+    color: transparent;
+    font-size: 12px;
+    margin-top: 2px;
+  }
+  .jcard__check:hover { border-color: var(--c-accent); }
+  .jcard__check.is-on {
+    background: var(--c-accent); border-color: var(--c-accent); color: var(--c-text-inverse);
+  }
+
+  .jcard__title {
+    display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
+    font-size: var(--fs-lg); font-weight: var(--fw-semibold);
+    color: var(--c-text); letter-spacing: var(--tracking-tight);
+    line-height: 1.3;
+  }
+  .jcard__meta {
+    margin-top: var(--s-2);
+    display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+    color: var(--c-text-2); font-size: var(--fs-sm);
+  }
+  .jcard__meta-sep { color: var(--c-text-3); font-size: 8px; }
+  .jcard__meta strong { color: var(--c-text); font-weight: var(--fw-medium); }
+
+  .jcard__actions {
+    display: flex; gap: var(--s-2); align-items: flex-start;
+  }
+
+  /* --- Reason --- */
+  .jcard__reason {
+    margin-top: var(--s-3);
+    padding-left: 32px;
+    color: var(--c-text-2);
+    font-size: var(--fs-sm); line-height: 1.55;
+  }
+  .jcard__reason strong { color: var(--c-text); font-weight: var(--fw-medium); }
+
+  /* --- Footer toolbar --- */
+  .jcard__foot {
+    margin-top: var(--s-4);
+    padding-left: 32px;
+    display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap;
+  }
+  .jcard__note {
+    flex: 1; min-width: 240px;
+  }
+  .jcard__note .input { height: 30px; font-size: var(--fs-sm); }
+
+  /* --- Status toggles inline --- */
+  .toggle-row { display: flex; gap: var(--s-2); }
+  .toggle {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 26px; padding: 0 var(--s-2);
+    background: var(--c-surface); border: 1px solid var(--c-border);
+    border-radius: var(--r-md); font-size: var(--fs-xs); font-weight: var(--fw-medium);
+    color: var(--c-text-2); cursor: pointer;
+    transition: all var(--t-fast);
+  }
+  .toggle:hover { border-color: var(--c-border-strong); color: var(--c-text); }
+  .toggle.is-on {
+    background: var(--c-success-soft); color: var(--c-success-text); border-color: #a7f3d0;
+  }
+  .toggle.is-on.toggle--applied {
+    background: var(--c-info-soft); color: var(--c-info-text); border-color: #bfdbfe;
+  }
+
+  /* --- Fit-row collapsible --- */
+  .fit-section {
+    margin-top: var(--s-4);
+    padding: var(--s-3) 0 0 32px;
+    border-top: 1px dashed var(--c-border);
+    display: flex; flex-direction: column; gap: var(--s-2);
+  }
+  .fit-row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+  .fit-label { font-size: var(--fs-xs); color: var(--c-text-3); text-transform: uppercase; letter-spacing: var(--tracking-wide); font-weight: var(--fw-medium); margin-right: var(--s-1); }
+  .fit-pill {
+    width: 30px; height: 30px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--c-border); border-radius: var(--r-md);
+    background: var(--c-surface); color: var(--c-text-2);
+    font-weight: var(--fw-semibold); font-size: var(--fs-sm);
+    cursor: pointer; transition: all var(--t-fast);
+  }
+  .fit-pill:hover { border-color: var(--c-accent); color: var(--c-accent-text); }
+  .fit-pill.is-on { background: var(--c-accent); border-color: var(--c-accent); color: var(--c-text-inverse); }
+  .fit-pill:focus-visible { outline: none; box-shadow: var(--sh-focus); border-color: var(--c-accent); }
+
+  /* --- Review panel (expanded state) --- */
+  .review-panel {
+    margin: var(--s-4) 0 0 32px;
+    background: var(--c-surface-2);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+  .review-panel__head {
+    padding: var(--s-3) var(--s-4);
+    background: var(--c-surface);
+    border-bottom: 1px solid var(--c-border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: var(--fs-xs); color: var(--c-text-3);
+    text-transform: uppercase; letter-spacing: var(--tracking-wide);
+    font-weight: var(--fw-medium);
+  }
+  .draft-text {
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    line-height: 1.55; color: var(--c-text);
+    padding: var(--s-4);
+    max-height: 280px; overflow-y: auto;
+    white-space: pre-wrap;
+    background: var(--c-surface);
+  }
+  .review-controls {
+    padding: var(--s-3) var(--s-4);
+    background: var(--c-surface);
+    border-top: 1px solid var(--c-border);
+  }
+  .review-controls .textarea { margin-bottom: var(--s-3); }
+  .review-actions { display: flex; gap: var(--s-2); align-items: center; flex-wrap: wrap; }
+  .review-actions__divider { flex: 1; }
+
+  /* --- Skeleton state --- */
+  .jcard.is-skeleton .jcard__title,
+  .jcard.is-skeleton .jcard__meta,
+  .jcard.is-skeleton .jcard__reason { color: transparent; }
+  .skel-line { display: block; height: 12px; border-radius: var(--r-sm); background: linear-gradient(90deg, var(--c-surface-2), var(--c-surface-3), var(--c-surface-2)); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+  /* --- Freshness indicators (color + symbol, not color alone) --- */
+  .freshness {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
+  }
+  .freshness--fresh { color: var(--c-success-text); }
+  .freshness--warm  { color: var(--c-warn-text); }
+  .freshness--stale { color: var(--c-danger-text); }
+  .freshness-dot { font-size: 14px; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="doc-header">
+    <h1>Job card · state matrix</h1>
+    <p>One job, six states. The card is the single highest-volume surface in the dashboard — it carries every interaction except scout and tailor-manual.</p>
+  </header>
+
+  <!-- ====================== 1. DEFAULT ====================== -->
+  <div class="state-label">1 · Default</div>
+  <article class="jcard">
+    <div class="jcard__top">
+      <div class="jcard__check" role="checkbox" aria-checked="false">✓</div>
+      <div>
+        <div class="jcard__title">
+          Senior Business Operations Manager
+          <span class="badge badge--accent">Score 4</span>
+        </div>
+        <div class="jcard__meta">
+          <span><strong>Snorkel AI</strong></span>
+          <span class="badge badge--vc">Backed · a16z</span>
+          <span class="jcard__meta-sep">●</span>
+          <span>San Francisco, CA</span>
+          <span class="jcard__meta-sep">●</span>
+          <span>Series C</span>
+          <span class="jcard__meta-sep">●</span>
+          <span class="freshness freshness--fresh"><span class="freshness-dot">●</span> 2d</span>
+        </div>
+      </div>
+      <div class="jcard__actions">
+        <a class="btn btn--ghost btn--sm">View JD ↗</a>
+        <a class="btn btn--sm">Apply ↗</a>
+        <button class="btn btn--primary btn--sm">Tailor</button>
+      </div>
+    </div>
+    <div class="jcard__reason">
+      <strong>Why matched:</strong> two-sided marketplace ops + AI-native company. JD asks for forecasting and partner ops — direct fit with Urban Company experience.
+    </div>
+    <div class="jcard__foot">
+      <div class="jcard__note"><input class="input" placeholder="Add notes…"></div>
+      <div class="toggle-row">
+        <button class="toggle">Reviewed</button>
+        <button class="toggle toggle--applied">Applied</button>
+      </div>
+    </div>
+  </article>
+
+  <!-- ====================== 2. SELECTED ====================== -->
+  <div class="state-label">2 · Selected (in bulk-tailor batch)</div>
+  <article class="jcard is-selected">
+    <div class="jcard__top">
+      <div class="jcard__check is-on" role="checkbox" aria-checked="true">✓</div>
+      <div>
+        <div class="jcard__title">
+          Forward Deployed Product Manager, Enterprise
+          <span class="badge badge--accent">Score 5</span>
+        </div>
+        <div class="jcard__meta">
+          <span><strong>Scale AI</strong></span>
+          <span class="badge badge--vc">Backed · Founders Fund</span>
+          <span class="jcard__meta-sep">●</span>
+          <span>San Francisco / Remote OK</span>
+          <span class="jcard__meta-sep">●</span>
+          <span>Series F</span>
+          <span class="jcard__meta-sep">●</span>
+          <span class="freshness freshness--fresh"><span class="freshness-dot">●</span> 1d</span>
+        </div>
+      </div>
+      <div class="jcard__actions">
+        <a class="btn btn--ghost btn--sm">View JD ↗</a>
+        <a class="btn btn--sm">Apply ↗</a>
+        <button class="btn btn--primary btn--sm">Tailor</button>
+      </div>
+    </div>
+    <div class="jcard__reason">
+      <strong>Why matched:</strong> FDE role calling for ML/agent deployment to enterprise — overlap with Armor Defense platform migration.
+    </div>
+    <div class="jcard__foot">
+      <div class="jcard__note"><input class="input" placeholder="Add notes…"></div>
+      <div class="toggle-row">
+        <button class="toggle">Reviewed</button>
+        <button class="toggle toggle--applied">Applied</button>
+      </div>
+    </div>
+  </article>
+
+  <!-- ====================== 3. TAILORED ====================== -->
+  <div class="state-label">3 · Already tailored (resume generated)</div>
+  <article class="jcard is-tailored">
+    <div class="jcard__top">
+      <div class="jcard__check" role="checkbox" aria-checked="false">✓</div>
+      <div>
+        <div class="jcard__title">
+          Product Manager, GTM Systems
+          <span class="badge badge--accent">Score 4</span>
+          <span class="badge badge--success"><span class="dot"></span>Tailored · 2 versions</span>
+        </div>
+        <div class="jcard__meta">
+          <span><strong>Dropbox</strong></span>
+          <span class="jcard__meta-sep">●</span>
+          <span>San Francisco / Remote OK</span>
+          <span class="jcard__meta-sep">●</span>
+          <span>Public</span>
+          <span class="jcard__meta-sep">●</span>
+          <span class="freshness freshness--warm"><span class="freshness-dot">◐</span> 9d</span>
+        </div>
+      </div>
+      <div class="jcard__actions">
+        <a class="btn btn--ghost btn--sm">View JD ↗</a>
+        <a class="btn btn--sm">Apply ↗</a>
+        <button class="btn btn--sm">Review / Re-tailor</button>
+      </div>
+    </div>
+    <div class="jcard__reason">
+      <strong>Why matched:</strong> GTM systems = revenue ops adjacent. JD highlights Salesforce + lead-routing modeling, parallels Accenture B2B marketplace launch.
+    </div>
+    <div class="jcard__foot">
+      <div class="jcard__note"><input class="input" value="Lead with Accenture; deemphasize marketplace where possible."></div>
+      <div class="toggle-row">
+        <button class="toggle is-on">✓ Reviewed</button>
+        <button class="toggle toggle--applied">Applied</button>
+      </div>
+    </div>
+  </article>
+
+  <!-- ====================== 4. FIT-SET (manual score) ====================== -->
+  <div class="state-label">4 · Manual fit score set</div>
+  <article class="jcard">
+    <div class="jcard__top">
+      <div class="jcard__check" role="checkbox" aria-checked="false">✓</div>
+      <div>
+        <div class="jcard__title">
+          Strategy &amp; Operations Manager, Consumer Revenue
+          <span class="badge badge--accent">Score 4</span>
+          <span class="badge badge--info">Mine · 5/5</span>
+        </div>
+        <div class="jcard__meta">
+          <span><strong>Discord</strong></span>
+          <span class="badge badge--vc">Backed · Greylock</span>
+          <span class="jcard__meta-sep">●</span>
+          <span>San Francisco</span>
+          <span class="jcard__meta-sep">●</span>
+          <span>Late-stage private</span>
+          <span class="jcard__meta-sep">●</span>
+          <span class="freshness freshness--warm"><span class="freshness-dot">◐</span> 12d</span>
+        </div>
+      </div>
+      <div class="jcard__actions">
+        <a class="btn btn--ghost btn--sm">View JD ↗</a>
+        <a class="btn btn--sm">Apply ↗</a>
+        <button class="btn btn--primary btn--sm">Tailor</button>
+      </div>
+    </div>
+    <div class="jcard__reason">
+      <strong>Why matched:</strong> revenue + monetization ops in consumer marketplace — Urban Company unit economics is the strongest analogue in the master resume.
+    </div>
+    <div class="jcard__foot">
+      <div class="jcard__note"><input class="input" placeholder="Add notes…"></div>
+      <div class="toggle-row">
+        <button class="toggle is-on">✓ Reviewed</button>
+        <button class="toggle toggle--applied">Applied</button>
+      </div>
+    </div>
+    <div class="fit-section">
+      <div class="fit-row">
+        <span class="fit-label">My fit</span>
+        <button class="fit-pill">1</button>
+        <button class="fit-pill">2</button>
+        <button class="fit-pill">3</button>
+        <button class="fit-pill">4</button>
+        <button class="fit-pill is-on">5</button>
+        <textarea class="textarea" rows="1" style="flex:1; min-height:30px; min-width:240px">Closest match yet — exactly the role I want.</textarea>
+        <button class="btn btn--sm">Save</button>
+        <span class="muted" style="font-size:var(--fs-xs)">Saved · just now</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ====================== 5. REVIEW PANEL OPEN ====================== -->
+  <div class="state-label">5 · Review / re-tailor panel open</div>
+  <article class="jcard is-tailored">
+    <div class="jcard__top">
+      <div class="jcard__check" role="checkbox" aria-checked="false">✓</div>
+      <div>
+        <div class="jcard__title">
+          Senior Business Operations Manager
+          <span class="badge badge--accent">Score 4</span>
+          <span class="badge badge--success"><span class="dot"></span>Tailored</span>
+        </div>
+        <div class="jcard__meta">
+          <span><strong>Snorkel AI</strong></span>
+          <span class="badge badge--vc">Backed · a16z</span>
+          <span class="jcard__meta-sep">●</span>
+          <span>San Francisco, CA</span>
+          <span class="jcard__meta-sep">●</span>
+          <span class="freshness freshness--fresh"><span class="freshness-dot">●</span> 2d</span>
+        </div>
+      </div>
+      <div class="jcard__actions">
+        <a class="btn btn--ghost btn--sm">View JD ↗</a>
+        <button class="btn btn--sm">Close</button>
+      </div>
+    </div>
+    <div class="review-panel">
+      <div class="review-panel__head">
+        <span>Draft · PPaul_20260512_snorkel_ai_senior_business.txt</span>
+        <span>last updated 4 min ago</span>
+      </div>
+<pre class="draft-text">Pratyush Paul · Senior Business Operations Manager · Snorkel AI
+
+(312) 678-3629 | pratyushpaul93@gmail.com | linkedin.com/in/pratyushpaul | github.com/pratyushpaul93-coder
+
+SUMMARY
+Strategy and Operations leader with 8+ years scaling marketplaces, B2B platforms,
+and AI-native infrastructure. Track record of building forecasting models, designing
+revenue-affecting partner programs, and shipping cross-functional rollouts that
+move adoption and unit economics.
+
+CORE EXPERIENCE
+Armor Defense | Director, Strategy and Operations | 2023 - present
+- Led migration of cybersecurity technology platform used by 400+ clients, providing
+  secure monitored cloud infra with inheritable compliance, reaching 80% adoption
+  within 3 months while retaining 98% of clients
+- ...</pre>
+      <div class="review-controls">
+        <textarea class="textarea" placeholder="Revision instructions — e.g. shorten the summary, emphasise marketplace experience">Shorten summary to 3 lines; lead with marketplace + forecasting; cut the compliance bullet detail.</textarea>
+        <div class="review-actions">
+          <button class="btn btn--sm">Apply comments ↻</button>
+          <button class="btn btn--sm">Regenerate fully</button>
+          <span class="review-actions__divider"></span>
+          <span class="muted" style="font-size:var(--fs-xs)">Sonnet 4.6 · ~30s</span>
+          <button class="btn btn--primary btn--sm">Generate PDF</button>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- ====================== 6. LOADING SKELETON ====================== -->
+  <div class="state-label">6 · Loading skeleton (during /api/data fetch)</div>
+  <article class="jcard is-skeleton" aria-busy="true">
+    <div class="jcard__top">
+      <div class="jcard__check" aria-hidden="true"></div>
+      <div>
+        <span class="skel-line" style="width:62%; height:18px"></span>
+        <div style="margin-top:var(--s-3); display:flex; gap:var(--s-3)">
+          <span class="skel-line" style="width:90px"></span>
+          <span class="skel-line" style="width:140px"></span>
+          <span class="skel-line" style="width:60px"></span>
+        </div>
+      </div>
+      <div class="jcard__actions">
+        <span class="skel-line" style="width:48px; height:26px"></span>
+        <span class="skel-line" style="width:48px; height:26px"></span>
+        <span class="skel-line" style="width:64px; height:26px"></span>
+      </div>
+    </div>
+    <div style="margin-top:var(--s-3); padding-left:32px">
+      <span class="skel-line" style="width:88%"></span>
+      <span class="skel-line" style="width:54%; margin-top:6px"></span>
+    </div>
+  </article>
+
+</div>
+</body>
+</html>

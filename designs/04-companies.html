@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>pp-jobapp · companies</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { padding: 0; }
+  .topbar { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,0.85); backdrop-filter: saturate(180%) blur(10px); border-bottom: 1px solid var(--c-border); }
+  .topbar__inner { max-width: var(--layout-max); margin: 0 auto; padding: var(--s-3) var(--layout-gutter); display: flex; align-items: center; gap: var(--s-4); }
+  .brand { font-size: var(--fs-md); font-weight: var(--fw-semibold); display: flex; align-items: center; gap: var(--s-2); }
+  .brand__dot { width: 10px; height: 10px; background: var(--c-accent); border-radius: 3px; transform: rotate(45deg); }
+  .nav { display: flex; gap: var(--s-1); margin-left: var(--s-6); }
+  .nav__link { padding: 6px var(--s-3); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--c-text-2); border-radius: var(--r-md); cursor: pointer; transition: all var(--t-fast); }
+  .nav__link:hover, .nav__link.is-active { background: var(--c-surface-2); color: var(--c-text); }
+  .topbar__spacer { flex: 1; }
+  .topbar__meta { font-size: var(--fs-xs); color: var(--c-text-3); }
+
+  .page { max-width: var(--layout-max); margin: 0 auto; padding: var(--s-8) var(--layout-gutter) var(--s-12); }
+  .page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-6); }
+  .page-header h1 { font-size: var(--fs-2xl); letter-spacing: -0.02em; }
+  .page-header__sub { color: var(--c-text-2); font-size: var(--fs-md); margin-top: 4px; }
+
+  /* status tiles row */
+  .scan-bar {
+    display: flex; gap: var(--s-3); margin-bottom: var(--s-6);
+    align-items: center; padding: var(--s-3) var(--s-4);
+    background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg);
+  }
+  .scan-bar__status { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-sm); }
+  .scan-bar__pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--c-success); position: relative; }
+  .scan-bar__pulse::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%;
+    border: 2px solid var(--c-success); opacity: 0.4;
+    animation: pulse 2s ease-out infinite;
+  }
+  @keyframes pulse { from { transform: scale(0.8); opacity: 0.6; } to { transform: scale(1.6); opacity: 0; } }
+  .scan-bar__divider { width: 1px; height: 24px; background: var(--c-border); }
+  .scan-bar__spacer { flex: 1; }
+
+  /* filter row */
+  .filterbar { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-3); }
+  .filterbar__search { position: relative; width: 240px; }
+  .filterbar__search .input { padding-left: 32px; }
+  .filterbar__search::before { content: '⌕'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--c-text-3); font-size: 14px; pointer-events: none; }
+  .filterbar__spacer { flex: 1; }
+
+  /* table */
+  .table-card { padding: 0; overflow: hidden; }
+  .table th { cursor: pointer; user-select: none; transition: color var(--t-fast); }
+  .table th:hover { color: var(--c-text); }
+  .table th.is-sorted { color: var(--c-text); }
+  .table th.is-sorted::after { content: ' ↓'; color: var(--c-accent); }
+  .table th.is-sorted--asc::after { content: ' ↑'; color: var(--c-accent); }
+  .table tbody tr { cursor: pointer; }
+
+  /* ATS badges colored per provider */
+  .ats--greenhouse { background: #ecfdf5; color: #166534; }
+  .ats--ashby      { background: #f5f3ff; color: #6d28d9; }
+  .ats--lever      { background: #fef3c7; color: #92400e; }
+  .ats--workday    { background: #eff6ff; color: #1d4ed8; }
+  .ats--tavily     { background: var(--c-surface-2); color: var(--c-text-2); }
+  .ats--broken     { background: var(--c-danger-soft); color: var(--c-danger-text); }
+  .ats--none       { background: var(--c-surface-2); color: var(--c-text-3); }
+
+  .row-actions {
+    display: flex; gap: var(--s-1); justify-content: flex-end;
+    opacity: 0; transition: opacity var(--t-fast);
+  }
+  .table tbody tr:hover .row-actions { opacity: 1; }
+
+  /* empty state */
+  .empty-state {
+    padding: var(--s-12) var(--s-6); text-align: center;
+    color: var(--c-text-2);
+  }
+  .empty-state__icon {
+    font-size: 32px; color: var(--c-text-3); margin-bottom: var(--s-3);
+  }
+  .empty-state__title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--c-text); margin-bottom: var(--s-2); }
+  .empty-state__sub { font-size: var(--fs-sm); color: var(--c-text-2); max-width: 40ch; margin: 0 auto var(--s-4); }
+
+  .section-label {
+    font-size: var(--fs-xs); color: var(--c-text-3);
+    text-transform: uppercase; letter-spacing: var(--tracking-wide);
+    font-weight: var(--fw-medium);
+    margin: var(--s-8) 0 var(--s-3);
+  }
+  .num-cell { font-variant-numeric: tabular-nums; }
+  .match-indicator { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--c-success); margin-right: 6px; vertical-align: 1px; }
+  .match-indicator--zero { background: var(--c-border-strong); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <div class="brand"><span class="brand__dot"></span> pp-jobapp</div>
+    <nav class="nav">
+      <a class="nav__link">Pipeline</a>
+      <a class="nav__link is-active">Companies</a>
+      <a class="nav__link">Matching jobs</a>
+      <a class="nav__link">Manual tailor</a>
+    </nav>
+    <div class="topbar__spacer"></div>
+    <div class="topbar__meta">1,694 active companies</div>
+  </div>
+</header>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <h1>Companies</h1>
+      <p class="page-header__sub">All tracked sources. Sort by matches to see where the pipeline is paying off.</p>
+    </div>
+    <div class="row" style="gap:var(--s-2)">
+      <button class="btn">Import list</button>
+      <button class="btn btn--primary">+ Add company</button>
+    </div>
+  </header>
+
+  <!-- ============ SCAN BAR ============ -->
+  <section class="scan-bar">
+    <div class="scan-bar__status">
+      <span class="scan-bar__pulse"></span>
+      <span><strong style="color:var(--c-text)">Scout idle</strong> · last run 2 min ago</span>
+    </div>
+    <div class="scan-bar__divider"></div>
+    <div class="scan-bar__status">
+      <span class="muted">Endpoints discovered today:</span>
+      <strong style="color:var(--c-text)">+24</strong>
+    </div>
+    <div class="scan-bar__divider"></div>
+    <div class="scan-bar__status">
+      <span class="muted">Companies with matches:</span>
+      <strong style="color:var(--c-text)">233 / 1,694 (13.8%)</strong>
+    </div>
+    <div class="scan-bar__spacer"></div>
+    <button class="btn btn--primary btn--sm">Run scout now</button>
+  </section>
+
+  <!-- ============ FILTER ROW ============ -->
+  <section class="filterbar">
+    <div class="filterbar__search">
+      <input class="input" placeholder="Search company name…">
+    </div>
+    <details class="ms" style="position:relative">
+      <summary class="pill">ATS provider · all</summary>
+    </details>
+    <details class="ms" style="position:relative">
+      <summary class="pill">Stage · all</summary>
+    </details>
+    <details class="ms" style="position:relative">
+      <summary class="pill">Vertical · SaaS</summary>
+    </details>
+    <button class="pill">Has matches</button>
+    <div class="filterbar__spacer"></div>
+    <span class="muted" style="font-size:var(--fs-sm)">Showing 233 of 1,694</span>
+  </section>
+
+  <!-- ============ TABLE ============ -->
+  <section class="card table-card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width:32px"></th>
+          <th>Company</th>
+          <th>ATS</th>
+          <th>Stage</th>
+          <th>Vertical</th>
+          <th class="num">Jobs</th>
+          <th class="num is-sorted">Matches</th>
+          <th>Last scan</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Anthropic</strong></td>
+          <td><span class="badge ats--greenhouse">Greenhouse</span></td>
+          <td><span class="muted">Late-stage</span></td>
+          <td><span class="muted">AI infra</span></td>
+          <td class="num">38</td>
+          <td class="num"><span class="match-indicator"></span><strong>12</strong></td>
+          <td class="muted">2 min ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>OpenAI</strong></td>
+          <td><span class="badge ats--ashby">Ashby</span></td>
+          <td><span class="muted">Late-stage</span></td>
+          <td><span class="muted">AI infra</span></td>
+          <td class="num">62</td>
+          <td class="num"><span class="match-indicator"></span><strong>10</strong></td>
+          <td class="muted">2 min ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Snorkel AI</strong></td>
+          <td><span class="badge ats--ashby">Ashby</span></td>
+          <td><span class="muted">Series C</span></td>
+          <td><span class="muted">ML platform</span></td>
+          <td class="num">9</td>
+          <td class="num"><span class="match-indicator"></span><strong>4</strong></td>
+          <td class="muted">2 min ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Scale AI</strong></td>
+          <td><span class="badge ats--greenhouse">Greenhouse</span></td>
+          <td><span class="muted">Series F</span></td>
+          <td><span class="muted">AI infra</span></td>
+          <td class="num">41</td>
+          <td class="num"><span class="match-indicator"></span><strong>9</strong></td>
+          <td class="muted">3 min ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Harvey</strong></td>
+          <td><span class="badge ats--ashby">Ashby</span></td>
+          <td><span class="muted">Series D</span></td>
+          <td><span class="muted">Vertical AI</span></td>
+          <td class="num">16</td>
+          <td class="num"><span class="match-indicator"></span><strong>8</strong></td>
+          <td class="muted">3 min ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Airbnb</strong></td>
+          <td><span class="badge ats--greenhouse">Greenhouse</span></td>
+          <td><span class="muted">Public</span></td>
+          <td><span class="muted">Marketplace</span></td>
+          <td class="num">16</td>
+          <td class="num"><span class="match-indicator"></span><strong>3</strong></td>
+          <td class="muted">3 days ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Affirm</strong></td>
+          <td><span class="badge ats--greenhouse">Greenhouse</span></td>
+          <td><span class="muted">Public</span></td>
+          <td><span class="muted">Fintech</span></td>
+          <td class="num">12</td>
+          <td class="num"><span class="match-indicator"></span><strong>2</strong></td>
+          <td class="muted">3 days ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Stripe</strong></td>
+          <td><span class="badge ats--lever">Lever</span></td>
+          <td><span class="muted">Late-stage</span></td>
+          <td><span class="muted">Fintech</span></td>
+          <td class="num">28</td>
+          <td class="num"><span class="match-indicator match-indicator--zero"></span><span class="muted">0</span></td>
+          <td class="muted">3 days ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Notion</strong></td>
+          <td><span class="badge ats--workday">Workday</span></td>
+          <td><span class="muted">Late-stage</span></td>
+          <td><span class="muted">Productivity</span></td>
+          <td class="num">22</td>
+          <td class="num"><span class="match-indicator"></span><strong>5</strong></td>
+          <td class="muted">3 days ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>Replit</strong></td>
+          <td><span class="badge ats--broken">Broken</span></td>
+          <td><span class="muted">Series B</span></td>
+          <td><span class="muted">Dev tools</span></td>
+          <td class="num">—</td>
+          <td class="num"><span class="muted">—</span></td>
+          <td><span class="badge badge--danger">Scan failed</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Re-probe</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--c-accent)"></td>
+          <td><strong>0x</strong></td>
+          <td><span class="badge ats--ashby">Ashby</span></td>
+          <td><span class="muted">Unknown</span></td>
+          <td><span class="muted">SaaS</span></td>
+          <td class="num">0</td>
+          <td class="num"><span class="match-indicator match-indicator--zero"></span><span class="muted">0</span></td>
+          <td class="muted">3 days ago</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn--sm">Open ↗</button>
+              <button class="btn btn--ghost btn--sm">⋯</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ ALT STATES ============ -->
+
+  <div class="section-label">Empty state · no companies match filter</div>
+  <section class="card">
+    <div class="empty-state">
+      <div class="empty-state__icon">⌕</div>
+      <div class="empty-state__title">No companies match your filter</div>
+      <div class="empty-state__sub">Try removing one of the active filters, or add a new company manually.</div>
+      <button class="btn btn--primary">+ Add company</button>
+    </div>
+  </section>
+
+  <div class="section-label">Loading state · during /api/companies fetch</div>
+  <section class="card table-card">
+    <table class="table">
+      <thead><tr><th></th><th>Company</th><th>ATS</th><th>Stage</th><th>Vertical</th><th class="num">Jobs</th><th class="num">Matches</th><th>Last scan</th><th></th></tr></thead>
+      <tbody>
+        <tr><td colspan="9" style="padding:0"></td></tr>
+        <tr><td></td>
+          <td><span class="skeleton" style="width:140px"></span></td>
+          <td><span class="skeleton" style="width:80px; height:18px; border-radius:999px"></span></td>
+          <td><span class="skeleton" style="width:60px"></span></td>
+          <td><span class="skeleton" style="width:70px"></span></td>
+          <td><span class="skeleton" style="width:30px"></span></td>
+          <td><span class="skeleton" style="width:24px"></span></td>
+          <td><span class="skeleton" style="width:80px"></span></td>
+          <td></td>
+        </tr>
+        <tr><td></td>
+          <td><span class="skeleton" style="width:100px"></span></td>
+          <td><span class="skeleton" style="width:80px; height:18px; border-radius:999px"></span></td>
+          <td><span class="skeleton" style="width:60px"></span></td>
+          <td><span class="skeleton" style="width:70px"></span></td>
+          <td><span class="skeleton" style="width:30px"></span></td>
+          <td><span class="skeleton" style="width:24px"></span></td>
+          <td><span class="skeleton" style="width:80px"></span></td>
+          <td></td>
+        </tr>
+        <tr><td></td>
+          <td><span class="skeleton" style="width:160px"></span></td>
+          <td><span class="skeleton" style="width:80px; height:18px; border-radius:999px"></span></td>
+          <td><span class="skeleton" style="width:60px"></span></td>
+          <td><span class="skeleton" style="width:70px"></span></td>
+          <td><span class="skeleton" style="width:30px"></span></td>
+          <td><span class="skeleton" style="width:24px"></span></td>
+          <td><span class="skeleton" style="width:80px"></span></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</main>
+</body>
+</html>

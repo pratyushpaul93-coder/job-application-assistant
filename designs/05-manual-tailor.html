@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>pp-jobapp · manual tailor</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { padding: 0; }
+  .topbar { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,0.85); backdrop-filter: saturate(180%) blur(10px); border-bottom: 1px solid var(--c-border); }
+  .topbar__inner { max-width: var(--layout-max); margin: 0 auto; padding: var(--s-3) var(--layout-gutter); display: flex; align-items: center; gap: var(--s-4); }
+  .brand { font-size: var(--fs-md); font-weight: var(--fw-semibold); display: flex; align-items: center; gap: var(--s-2); }
+  .brand__dot { width: 10px; height: 10px; background: var(--c-accent); border-radius: 3px; transform: rotate(45deg); }
+  .nav { display: flex; gap: var(--s-1); margin-left: var(--s-6); }
+  .nav__link { padding: 6px var(--s-3); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--c-text-2); border-radius: var(--r-md); cursor: pointer; transition: all var(--t-fast); }
+  .nav__link:hover, .nav__link.is-active { background: var(--c-surface-2); color: var(--c-text); }
+  .topbar__spacer { flex: 1; }
+
+  .page { max-width: var(--layout-max); margin: 0 auto; padding: var(--s-8) var(--layout-gutter) var(--s-12); }
+  .page-header { margin-bottom: var(--s-6); }
+  .page-header h1 { font-size: var(--fs-2xl); letter-spacing: -0.02em; }
+  .page-header__sub { color: var(--c-text-2); font-size: var(--fs-md); margin-top: 4px; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: var(--s-4);
+    align-items: start;
+  }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  .panel { padding: var(--s-5) var(--s-6); }
+  .panel__head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: var(--s-4);
+  }
+  .panel__title { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+  .panel__hint { font-size: var(--fs-xs); color: var(--c-text-3); }
+
+  .field { margin-bottom: var(--s-4); }
+  .field__label {
+    display: block;
+    font-size: var(--fs-xs); color: var(--c-text-2);
+    text-transform: uppercase; letter-spacing: var(--tracking-wide);
+    font-weight: var(--fw-medium);
+    margin-bottom: var(--s-2);
+  }
+  .field__hint { font-size: var(--fs-xs); color: var(--c-text-3); margin-top: var(--s-1); }
+
+  .toggle-row { display: flex; gap: var(--s-2); margin-bottom: var(--s-3); }
+  .seg {
+    display: inline-flex; padding: 2px; background: var(--c-surface-2); border-radius: var(--r-md); border: 1px solid var(--c-border);
+  }
+  .seg button {
+    border: none; background: transparent; font-family: inherit;
+    font-size: var(--fs-sm); font-weight: var(--fw-medium);
+    color: var(--c-text-2); height: 26px; padding: 0 var(--s-3); border-radius: 6px;
+    cursor: pointer; transition: all var(--t-fast);
+  }
+  .seg button.is-active { background: var(--c-surface); color: var(--c-text); box-shadow: var(--sh-1); }
+
+  .submit-row {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding-top: var(--s-4); border-top: 1px solid var(--c-border); margin-top: var(--s-4);
+  }
+  .submit-row__spacer { flex: 1; }
+
+  /* draft panel */
+  .draft-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--c-border);
+    background: var(--c-surface-2);
+  }
+  .draft-head__name { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--c-text); }
+  .draft-head__age { font-size: var(--fs-xs); color: var(--c-text-3); }
+  .draft-body {
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    line-height: 1.6; color: var(--c-text);
+    padding: var(--s-4);
+    max-height: 520px; overflow-y: auto;
+    white-space: pre-wrap;
+    background: var(--c-surface);
+  }
+  .draft-controls {
+    padding: var(--s-4);
+    background: var(--c-surface-2);
+    border-top: 1px solid var(--c-border);
+  }
+  .draft-controls .row { gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap; }
+
+  /* empty draft */
+  .draft-empty {
+    padding: var(--s-12) var(--s-6); text-align: center;
+    color: var(--c-text-2);
+  }
+  .draft-empty__icon { font-size: 36px; color: var(--c-text-3); margin-bottom: var(--s-3); }
+  .draft-empty__title { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--c-text); margin-bottom: var(--s-2); }
+  .draft-empty__sub { font-size: var(--fs-sm); max-width: 32ch; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <div class="brand"><span class="brand__dot"></span> pp-jobapp</div>
+    <nav class="nav">
+      <a class="nav__link">Pipeline</a>
+      <a class="nav__link">Companies</a>
+      <a class="nav__link">Matching jobs</a>
+      <a class="nav__link is-active">Manual tailor</a>
+    </nav>
+    <div class="topbar__spacer"></div>
+  </div>
+</header>
+
+<main class="page">
+
+  <header class="page-header">
+    <h1>Manual tailor</h1>
+    <p class="page-header__sub">Tailor a resume for a job that isn't in the pipeline yet — paste a URL or a job description.</p>
+  </header>
+
+  <div class="two-col">
+
+    <!-- ============ INPUT PANEL ============ -->
+    <section class="card panel">
+      <div class="panel__head">
+        <div class="panel__title">Job</div>
+        <div class="panel__hint">All fields except notes are required</div>
+      </div>
+
+      <div class="toggle-row">
+        <div class="seg">
+          <button class="is-active">Paste URL</button>
+          <button>Paste JD text</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label">Role title</label>
+        <input class="input" value="Senior Business Operations Manager">
+      </div>
+
+      <div class="field">
+        <label class="field__label">Company</label>
+        <input class="input" value="Snorkel AI">
+      </div>
+
+      <div class="field">
+        <label class="field__label">Job posting URL</label>
+        <input class="input" value="https://jobs.ashbyhq.com/snorkel-ai/abc123">
+        <div class="field__hint">Will fetch and clean the JD automatically (~6KB cap).</div>
+      </div>
+
+      <div class="field">
+        <label class="field__label">Version tag · optional</label>
+        <input class="input" placeholder="e.g. v2, exec-heavy, marketplace-lean">
+        <div class="field__hint">Adds a suffix to the saved filename so you can keep multiple drafts.</div>
+      </div>
+
+      <div class="field">
+        <label class="field__label">Tailoring notes · optional</label>
+        <textarea class="textarea" rows="4" placeholder="Anything to bias the framing for this role — e.g. 'lead with marketplace + forecasting, deemphasize compliance'">Lead with Urban Company marketplace work. Emphasize forecasting and partner economics. Cut Armor Defense down to 2 bullets.</textarea>
+      </div>
+
+      <div class="submit-row">
+        <span class="muted" style="font-size:var(--fs-xs)">Uses Sonnet 4.6 · ~30s</span>
+        <div class="submit-row__spacer"></div>
+        <button class="btn">Reset</button>
+        <button class="btn btn--primary">Tailor resume</button>
+      </div>
+    </section>
+
+    <!-- ============ DRAFT PANEL ============ -->
+    <section class="card" style="padding:0">
+      <div class="draft-head">
+        <div class="draft-head__name">PPaul_20260512_snorkel_ai_senior_business.txt</div>
+        <div class="draft-head__age">just now · 4,992 chars</div>
+      </div>
+<pre class="draft-body">Pratyush Paul · Senior Business Operations Manager · Snorkel AI
+
+(312) 678-3629 | pratyushpaul93@gmail.com | linkedin.com/in/pratyushpaul | github.com/pratyushpaul93-coder
+
+SUMMARY
+Strategy and Operations leader with 8+ years scaling marketplaces, B2B platforms,
+and AI-native infrastructure. Forecasting, partner economics, and cross-functional
+rollouts at unit-economic scale.
+
+CORE EXPERIENCE
+Urban Company | Strategy and Operations, Partner Network | 2018 - 2020
+- Restructured agency partnerships across 4 cities, achieving 10% cost reduction
+  and 15% quality improvement through tighter unit economics and partner SLAs
+- Built two-sided forecasting model for partner supply and consumer demand;
+  reduced wait-time stockouts by 23% in the top-3 demand zones
+- Designed onboarding ladder that doubled active partner cohort within 90 days
+
+Armor Defense | Director, Strategy and Operations | 2023 - present
+- Led migration of cybersecurity platform used by 400+ clients to a secure
+  monitored cloud infra with inheritable compliance, hitting 80% adoption
+  in 3 months while retaining 98% of the book
+- Built revenue forecasting layer that informed the FY24 budget; flagged a
+  $1.4M ARR risk window and unlocked a 5-customer retention play
+
+AI/TECHNICAL PROJECTS
+- SEC filings analysis: Financial disclosure analysis for public companies -
+  Python, NumPy vectorstore. GitHub: pp-market-intelligence
+- Playlist generator: Liked song classifier with 5-tier genre fallback and
+  automatic playlist creation - MCP. GitHub: pp-genre-classifer
+- Job application assistant: Scrape longlist of target companies, match jobs
+  and tailor resume - ATS API automation, DeepSeek scoring, Flask dashboard.
+  GitHub: job-application-assistant
+
+EDUCATION AND OTHER EXPERIENCES
+National University of Singapore (NUS) | BSc Economics | Jul 2014 - Jan 2018
+Alice, New York | Sales Strategy and Operations Intern | Jul 2016 - Jul 2017
+Singapore Civil Defense Force | Lieutenant (Rota Commander) | Mar 2012 - Mar 2014</pre>
+      <div class="draft-controls">
+        <textarea class="textarea" rows="2" placeholder="Revision instructions — applied via Haiku 4.5">Shorten summary to 3 lines; remove the playlist generator project for this one.</textarea>
+        <div class="row">
+          <button class="btn btn--sm">Apply comments ↻</button>
+          <button class="btn btn--sm">Regenerate fully</button>
+          <span class="muted" style="font-size:var(--fs-xs); margin-left:auto">Haiku 4.5 · ~8s</span>
+          <button class="btn btn--primary btn--sm">Generate PDF</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ EMPTY DRAFT STATE (alt) ============ -->
+  <h3 style="font-size:var(--fs-xs); color:var(--c-text-3); text-transform:uppercase; letter-spacing:var(--tracking-wide); font-weight:var(--fw-medium); margin:var(--s-10) 0 var(--s-3)">Draft panel · empty state (before first tailor)</h3>
+  <section class="card" style="padding:0; max-width: 480px">
+    <div class="draft-empty">
+      <div class="draft-empty__icon">⌗</div>
+      <div class="draft-empty__title">No draft yet</div>
+      <div class="draft-empty__sub">Fill in the role, company, and URL or JD text, then click <strong>Tailor resume</strong>. The draft will appear here.</div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

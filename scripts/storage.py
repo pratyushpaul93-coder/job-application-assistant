@@ -52,6 +52,82 @@ def _ensure_columns(conn: sqlite3.Connection) -> None:
             "ALTER TABLE job_scores ADD COLUMN rubric_version TEXT NOT NULL DEFAULT '0'"
         )
         conn.commit()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workday_job_jds (
+            apply_url TEXT PRIMARY KEY,
+            jd_text TEXT NOT NULL,
+            fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS outreach_drafts (
+            id INTEGER PRIMARY KEY,
+            job_id INTEGER NOT NULL REFERENCES job_postings(id) ON DELETE CASCADE,
+            subject TEXT NOT NULL,
+            body TEXT NOT NULL,
+            reasoning_json TEXT NOT NULL DEFAULT '{}',
+            model TEXT NOT NULL,
+            word_count INTEGER,
+            status TEXT NOT NULL DEFAULT 'draft',
+            sent_at TEXT,
+            edited INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_outreach_drafts_job ON outreach_drafts(job_id)")
+    # Multi-variant + outcome capture: idempotent column adds.
+    draft_cols = {row[1] for row in conn.execute("PRAGMA table_info(outreach_drafts)")}
+    for col, ddl in (
+        ("variant_group_id", "ALTER TABLE outreach_drafts ADD COLUMN variant_group_id TEXT"),
+        ("slant",            "ALTER TABLE outreach_drafts ADD COLUMN slant TEXT"),
+        ("is_winner",        "ALTER TABLE outreach_drafts ADD COLUMN is_winner INTEGER NOT NULL DEFAULT 0"),
+        ("outcome",          "ALTER TABLE outreach_drafts ADD COLUMN outcome TEXT"),
+        ("outcome_at",       "ALTER TABLE outreach_drafts ADD COLUMN outcome_at TEXT"),
+        ("outcome_notes",    "ALTER TABLE outreach_drafts ADD COLUMN outcome_notes TEXT"),
+        ("original_body",    "ALTER TABLE outreach_drafts ADD COLUMN original_body TEXT"),
+        ("edit_count",       "ALTER TABLE outreach_drafts ADD COLUMN edit_count INTEGER NOT NULL DEFAULT 0"),
+        ("cost_usd",         "ALTER TABLE outreach_drafts ADD COLUMN cost_usd REAL"),
+    ):
+        if col not in draft_cols:
+            conn.execute(ddl)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_outreach_drafts_variant_group ON outreach_drafts(variant_group_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_outreach_drafts_outcome ON outreach_drafts(outcome)")
+    # Company-level research cache: web_search is the dominant cost (see [[feedback-llm-search-cost]]).
+    # Drafter checks fetched_at and refreshes per TTL (default 30d).
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS outreach_research_cache (
+            company_id INTEGER PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+            research_json TEXT NOT NULL,
+            sources_json TEXT NOT NULL DEFAULT '[]',
+            model TEXT NOT NULL,
+            cost_usd REAL,
+            search_count INTEGER NOT NULL DEFAULT 0,
+            fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    company_cols = {row[1] for row in conn.execute("PRAGMA table_info(companies)")}
+    for col, ddl in (
+        ("ticker",         "ALTER TABLE companies ADD COLUMN ticker TEXT"),
+        ("hq_city",        "ALTER TABLE companies ADD COLUMN hq_city TEXT"),
+        ("hq_state",       "ALTER TABLE companies ADD COLUMN hq_state TEXT"),
+        ("employee_count", "ALTER TABLE companies ADD COLUMN employee_count INTEGER"),
+        ("company_type",   "ALTER TABLE companies ADD COLUMN company_type TEXT"),
+    ):
+        if col not in company_cols:
+            conn.execute(ddl)
+    interaction_cols = {row[1] for row in conn.execute("PRAGMA table_info(job_interactions)")}
+    if interaction_cols and "reached_out" not in interaction_cols:
+        conn.execute("ALTER TABLE job_interactions ADD COLUMN reached_out INTEGER NOT NULL DEFAULT 0")
+    if interaction_cols and "no_outreach" not in interaction_cols:
+        conn.execute("ALTER TABLE job_interactions ADD COLUMN no_outreach INTEGER NOT NULL DEFAULT 0")
+    conn.commit()
 
 
 SCHEMA = """
@@ -63,6 +139,11 @@ CREATE TABLE IF NOT EXISTS companies (
     stage TEXT,
     vertical TEXT,
     headcount_range TEXT,
+    ticker TEXT,
+    hq_city TEXT,
+    hq_state TEXT,
+    employee_count INTEGER,
+    company_type TEXT,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -154,6 +235,8 @@ CREATE TABLE IF NOT EXISTS job_interactions (
     selected INTEGER NOT NULL DEFAULT 0,
     reviewed INTEGER NOT NULL DEFAULT 0,
     applied INTEGER NOT NULL DEFAULT 0,
+    reached_out INTEGER NOT NULL DEFAULT 0,
+    no_outreach INTEGER NOT NULL DEFAULT 0,
     comment TEXT,
     tags_json TEXT NOT NULL DEFAULT '[]',
     manual_score INTEGER,
@@ -174,10 +257,53 @@ CREATE TABLE IF NOT EXISTS resume_artifacts (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS workday_job_jds (
+    apply_url TEXT PRIMARY KEY,
+    jd_text TEXT NOT NULL,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS outreach_drafts (
+    id INTEGER PRIMARY KEY,
+    job_id INTEGER NOT NULL REFERENCES job_postings(id) ON DELETE CASCADE,
+    subject TEXT NOT NULL,
+    body TEXT NOT NULL,
+    reasoning_json TEXT NOT NULL DEFAULT '{}',
+    model TEXT NOT NULL,
+    word_count INTEGER,
+    status TEXT NOT NULL DEFAULT 'draft',
+    sent_at TEXT,
+    edited INTEGER NOT NULL DEFAULT 0,
+    variant_group_id TEXT,
+    slant TEXT,
+    is_winner INTEGER NOT NULL DEFAULT 0,
+    outcome TEXT,
+    outcome_at TEXT,
+    outcome_notes TEXT,
+    original_body TEXT,
+    edit_count INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS outreach_research_cache (
+    company_id INTEGER PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    research_json TEXT NOT NULL,
+    sources_json TEXT NOT NULL DEFAULT '[]',
+    model TEXT NOT NULL,
+    cost_usd REAL,
+    search_count INTEGER NOT NULL DEFAULT 0,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_companies_active ON companies(active);
 CREATE INDEX IF NOT EXISTS idx_job_postings_company ON job_postings(company_id);
 CREATE INDEX IF NOT EXISTS idx_job_postings_posted ON job_postings(posted_date);
 CREATE INDEX IF NOT EXISTS idx_job_scores_scorer_score ON job_scores(scorer, score);
+CREATE INDEX IF NOT EXISTS idx_outreach_drafts_job ON outreach_drafts(job_id);
+CREATE INDEX IF NOT EXISTS idx_outreach_drafts_variant_group ON outreach_drafts(variant_group_id);
+CREATE INDEX IF NOT EXISTS idx_outreach_drafts_outcome ON outreach_drafts(outcome);
 """
 
 
@@ -194,6 +320,11 @@ def upsert_company(
     stage: str | None = None,
     vertical: str | None = None,
     headcount_range: str | None = None,
+    ticker: str | None = None,
+    hq_city: str | None = None,
+    hq_state: str | None = None,
+    employee_count: int | None = None,
+    company_type: str | None = None,
     active: bool = True,
 ) -> int:
     normalized = normalize_name(name)
@@ -202,21 +333,94 @@ def upsert_company(
     conn.execute(
         """
         INSERT INTO companies
-            (canonical_name, normalized_name, website_url, stage, vertical, headcount_range, active)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (canonical_name, normalized_name, website_url, stage, vertical, headcount_range,
+             ticker, hq_city, hq_state, employee_count, company_type, active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(normalized_name) DO UPDATE SET
             canonical_name = COALESCE(NULLIF(excluded.canonical_name, ''), companies.canonical_name),
             website_url = COALESCE(NULLIF(excluded.website_url, ''), companies.website_url),
             stage = COALESCE(NULLIF(excluded.stage, ''), companies.stage),
             vertical = COALESCE(NULLIF(excluded.vertical, ''), companies.vertical),
             headcount_range = COALESCE(NULLIF(excluded.headcount_range, ''), companies.headcount_range),
+            ticker = COALESCE(NULLIF(excluded.ticker, ''), companies.ticker),
+            hq_city = COALESCE(NULLIF(excluded.hq_city, ''), companies.hq_city),
+            hq_state = COALESCE(NULLIF(excluded.hq_state, ''), companies.hq_state),
+            employee_count = COALESCE(excluded.employee_count, companies.employee_count),
+            company_type = COALESCE(NULLIF(excluded.company_type, ''), companies.company_type),
             active = MAX(companies.active, excluded.active),
             updated_at = CURRENT_TIMESTAMP
         """,
-        (name.strip(), normalized, website_url, stage, vertical, headcount_range, int(active)),
+        (
+            name.strip(), normalized, website_url, stage, vertical, headcount_range,
+            ticker, hq_city, hq_state, employee_count, company_type, int(active),
+        ),
     )
     row = conn.execute("SELECT id FROM companies WHERE normalized_name = ?", (normalized,)).fetchone()
     return int(row["id"])
+
+
+def upsert_company_source_metadata(
+    conn: sqlite3.Connection,
+    company_id: int,
+    *,
+    source_type: str,
+    source_name: str = "",
+    raw_name: str | None = None,
+    source_rank: int | None = None,
+    fit_score: float | None = None,
+    raw_metadata: dict[str, Any] | None = None,
+    merge_keys: tuple[str, ...] = (),
+) -> None:
+    """Upsert a company_sources row, merging raw_metadata into the existing JSON.
+
+    For sources where one company maps to one row whose metadata accumulates over
+    re-runs (e.g. Built In: a company may join more lists across ingests). Keys in
+    merge_keys are list-merged with dedup; other keys are replaced.
+
+    Match is on UNIQUE(company_id, source_type, source_name, raw_name). Pass the
+    same identifier tuple on every run for the row to be updated rather than
+    duplicated.
+    """
+    new_meta = raw_metadata or {}
+    row = conn.execute(
+        """
+        SELECT id, raw_metadata_json FROM company_sources
+        WHERE company_id = ? AND source_type = ? AND source_name = ?
+          AND (raw_name IS ? OR raw_name = ?)
+        """,
+        (company_id, source_type, source_name, raw_name, raw_name),
+    ).fetchone()
+    if row:
+        existing = json.loads(row["raw_metadata_json"] or "{}")
+        merged = dict(existing)
+        for k, v in new_meta.items():
+            if k in merge_keys and isinstance(existing.get(k), list) and isinstance(v, list):
+                seen = {json_dumps(item) for item in existing[k]}
+                merged[k] = existing[k] + [item for item in v if json_dumps(item) not in seen]
+            else:
+                merged[k] = v
+        conn.execute(
+            """
+            UPDATE company_sources
+            SET raw_metadata_json = ?,
+                source_rank = COALESCE(?, source_rank),
+                fit_score = COALESCE(?, fit_score)
+            WHERE id = ?
+            """,
+            (json_dumps(merged), source_rank, fit_score, row["id"]),
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO company_sources
+                (company_id, source_type, source_name, source_rank, fit_score, raw_name, raw_metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                company_id, source_type, source_name or "",
+                source_rank, fit_score, raw_name, json_dumps(new_meta),
+            ),
+        )
 
 
 def add_company_source(
@@ -248,11 +452,15 @@ def add_company_source(
     )
 
 
-ATS_PROVIDERS_SCANNABLE = frozenset({"ashby", "greenhouse", "lever"})
+ATS_PROVIDERS_SCANNABLE = frozenset({"ashby", "greenhouse", "lever", "workday"})
 ATS_PROVIDERS_DETECTABLE = frozenset({
-    "ashby", "greenhouse", "lever",
+    "ashby", "greenhouse", "lever", "workday",
     "workable", "smartrecruiters", "bamboohr", "personio",
     "recruitee", "jazzhr", "teamtailor", "comeet",
+    # Enterprise ATSes — detection only (no scan integration yet). Added
+    # 2026-05-13 after a Fortune 1000 careers-page audit identified these as
+    # the dominant providers in the long tail. See CHANGELOG 2026-05-13.
+    "eightfold", "brassring", "avature", "phenom", "icims", "taleo", "oraclehcm",
 })
 ATS_PROVIDERS_ALLOWED = ATS_PROVIDERS_DETECTABLE | {"broken", "tavily", "unknown"}
 
@@ -308,6 +516,28 @@ def upsert_ats_endpoint(
 
 def ats_url(provider: str, slug: str) -> str:
     from urllib.parse import quote
+    if provider == "workday":
+        # Workday slug is 'tenant:dc:site'; reconstruct landing-page URL.
+        parts = (slug or "").split(":")
+        if len(parts) == 3 and all(parts):
+            tenant, dc, site = parts
+            return f"https://{tenant}.{dc}.myworkdayjobs.com/{site}"
+        return ""
+    if provider == "brassring":
+        # Brassring slug is 'partnerid:siteid'.
+        parts = (slug or "").split(":")
+        if len(parts) == 2 and all(parts):
+            p, s = parts
+            return f"https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid={p}&siteid={s}"
+        return ""
+    if provider == "oraclehcm":
+        # Oracle HCM slug is 'tenant:region:siteNumber'.
+        parts = (slug or "").split(":")
+        if len(parts) == 3 and all(parts):
+            tenant, region, site_no = parts
+            return (f"https://{tenant}.fa.{region}.oraclecloud.com/hcmUI/CandidateExperience/en/"
+                    f"sites/{site_no}/jobs")
+        return ""
     encoded = quote(slug or "", safe="")
     if provider == "ashby":
         return f"https://jobs.ashbyhq.com/{encoded}"
@@ -315,6 +545,17 @@ def ats_url(provider: str, slug: str) -> str:
         return f"https://boards.greenhouse.io/{encoded}"
     if provider == "lever":
         return f"https://jobs.lever.co/{encoded}"
+    if provider == "eightfold":
+        return f"https://{encoded}.eightfold.ai/careers"
+    if provider == "avature":
+        return f"https://{encoded}.avature.net/"
+    if provider == "icims":
+        # iCIMS slug already includes the `careers-` prefix when applicable.
+        return f"https://{encoded}.icims.com/jobs"
+    if provider == "phenom":
+        return f"https://{encoded}.phenompeople.com/"
+    if provider == "taleo":
+        return f"https://{encoded}.taleo.net/"
     return ""
 
 
@@ -325,7 +566,46 @@ def get_ats_endpoint(conn: sqlite3.Connection, provider: str, slug: str) -> sqli
     ).fetchone()
 
 
-def _http_get_json(url: str, timeout: int = 8) -> Any:
+def get_cached_workday_jd(
+    conn: sqlite3.Connection, apply_url: str, max_age_days: int = 30
+) -> str | None:
+    """Return cached JD text for a Workday job apply_url, or None on miss/stale.
+
+    Workday's listing endpoint returns title-only — full JDs require a
+    per-job detail fetch. Cache TTL defaults to 30 days, matching
+    discover_phase's max_age_days. Returns None for cache misses or
+    entries older than max_age_days.
+    """
+    if not apply_url:
+        return None
+    row = conn.execute(
+        """
+        SELECT jd_text FROM workday_job_jds
+        WHERE apply_url = ?
+          AND fetched_at > datetime('now', ?)
+        """,
+        (apply_url, f"-{int(max_age_days)} days"),
+    ).fetchone()
+    return row["jd_text"] if row else None
+
+
+def set_cached_workday_jd(conn: sqlite3.Connection, apply_url: str, jd_text: str) -> None:
+    """Upsert a Workday JD into the cache, refreshing fetched_at."""
+    if not apply_url:
+        return
+    conn.execute(
+        """
+        INSERT INTO workday_job_jds (apply_url, jd_text, fetched_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(apply_url) DO UPDATE SET
+            jd_text = excluded.jd_text,
+            fetched_at = CURRENT_TIMESTAMP
+        """,
+        (apply_url, jd_text or ""),
+    )
+
+
+def _http_get_json(url: str, timeout: int = 5) -> Any:
     """Pure HTTP helper: GET a URL, return parsed JSON or None on any failure."""
     import urllib.request
     try:
@@ -336,13 +616,52 @@ def _http_get_json(url: str, timeout: int = 8) -> Any:
         return None
 
 
-def _http_get_text(url: str, timeout: int = 10) -> str | None:
-    """Pure HTTP helper: GET a URL, return text body (capped) or None on failure."""
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,"
+              "image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
+
+
+def _http_get_text(url: str, timeout: int = 5) -> str | None:
+    """Pure HTTP helper: GET a URL, return text body (capped) or None on failure.
+
+    Cap is 2MB. Lower caps (the historical 300KB) silently drop ATS signals
+    on large careers pages — Blue Apron, BigCommerce, and ServiceTitan all
+    have their Workday URL past byte 350K (verified 2026-05-08).
+
+    Sends a full browser-mimic header set so Cloudflare/Akamai WAFs don't
+    403-block us on enterprise careers pages. Concentrix and similar Fortune
+    cos were silently failing detection on bare 'Mozilla/5.0' UA before
+    2026-05-12.
+    """
     import urllib.request
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request(url, headers=_BROWSER_HEADERS)
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.read().decode("utf-8", errors="ignore")[:300_000]
+            return r.read(2_000_000).decode("utf-8", errors="ignore")
+    except Exception:
+        return None
+
+
+def _http_post_json(url: str, body: dict, timeout: int = 5) -> Any:
+    """Pure HTTP helper: POST JSON body, return parsed JSON or None on any failure."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode(),
+            headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode())
     except Exception:
         return None
 
@@ -373,7 +692,34 @@ _DETECT_STRIP_SUFFIXES = (
     " group", " co", " industries",
 )
 _CANDIDATE_CAP = 80
-_FALSE_POSITIVE_SLUGS = frozenset({"embed", "jobs", "careers", "job_board", "demo"})
+_FALSE_POSITIVE_SLUGS = frozenset({
+    "embed", "jobs", "careers", "job_board", "demo",
+    # Combinatorial junk slugs produced by _candidate_slugs when the website
+    # URL has a generic subdomain like jobs.<co>.com. Found 2026-05-13 when
+    # Walgreens (https://jobs.walgreens.com) matched 'getjobs' as a Greenhouse
+    # board ("getjobs" is a real one-job board on Greenhouse). Same risk for
+    # any prefix+generic combination, so blocklist all of them.
+    "getjobs", "joinjobs", "tryjobs", "usejobs", "withjobs", "hellojobs",
+    "getcareers", "joincareers", "trycareers", "usecareers", "withcareers", "hellocareers",
+    "gettalent", "jointalent", "trytalent", "usetalent", "withtalent", "hellotalent",
+    "gethiring", "joinhiring", "tryhiring",
+    # CDN / asset / marketing-host subdomains that the new enterprise ATS
+    # signature regexes can capture if those hosts appear on a careers page.
+    # Found 2026-05-13: Lowe's careers loaded a script from
+    # `assets.phenompeople.com` (Phenom's CDN), matching `phenom/assets`;
+    # Pelico's careers page linked to `www.teamtailor.com` (marketing host),
+    # matching `teamtailor/www`. Blocklist these generic hostnames across
+    # all providers.
+    "assets", "static", "cdn", "media", "img", "images", "js", "css",
+    "api", "www", "app", "apps", "cookie-policy-scripts",
+    # iCIMS-specific tenant prefixes that aren't the real company tenant
+    "login", "internal",
+    # Taleo's shared host — `tbe.taleo.net` is the multi-tenant search front,
+    # not a specific company tenant. Real Taleo URLs encode the org via
+    # ?org=COMPANY URL params, which the current regex doesn't capture.
+    # Found 2026-05-13: Hovnanian Enterprises matched `taleo/tbe`.
+    "tbe", "chp", "chc",
+})
 
 
 def _candidate_slugs(name: str, website_url: str | None = None) -> list[str]:
@@ -463,22 +809,187 @@ def _lever_check(slug: str) -> dict | None:
     return None
 
 
+def _http_head(url: str, timeout: int = 5) -> int | None:
+    """Return HTTP status code via HEAD (falls back to GET if HEAD not allowed).
+
+    Used by lightweight detectors (Avature, iCIMS, Phenom, Taleo) that just
+    need to confirm the URL resolves to a real careers page, not a 4xx.
+    """
+    import urllib.request
+    for method in ("HEAD", "GET"):
+        try:
+            req = urllib.request.Request(url, headers=_BROWSER_HEADERS, method=method)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.status
+        except urllib.error.HTTPError as e:
+            return e.code
+        except Exception:
+            return None
+    return None
+
+
+def _eightfold_check(slug: str) -> dict | None:
+    """Eightfold careers tenant: `https://<slug>.eightfold.ai/careers`.
+
+    The public job API at `/api/apply/v2/jobs?domain=...` is Cloudflare-protected
+    (403 for direct requests), so we validate by hitting `/careers` and checking
+    for HTTP 200. Largest single recovery target — Walmart, Starbucks, Citi,
+    NGC, Morgan Stanley all use this pattern with their co-name subdomain.
+    """
+    status = _http_head(f"https://{slug}.eightfold.ai/careers")
+    if status and 200 <= status < 400:
+        return {"provider": "eightfold", "slug": slug, "total_jobs": None, "sample_titles": []}
+    return None
+
+
+def _avature_check(slug: str) -> dict | None:
+    """Avature careers tenant: `https://<slug>.avature.net/`. No public job-list
+    API; confirm via HEAD/GET 200. CBRE, Lockheed Martin, Delta, Ross Stores all
+    use this pattern with company-named subdomains.
+    """
+    status = _http_head(f"https://{slug}.avature.net/")
+    if status and 200 <= status < 400:
+        return {"provider": "avature", "slug": slug, "total_jobs": None, "sample_titles": []}
+    return None
+
+
+def _brassring_check(partnerid: str, siteid: str) -> dict | None:
+    """Brassring (Kenexa) careers: search URL on `sjobs.brassring.com` keyed by
+    `(partnerid, siteid)`. Slug stored as `partnerid:siteid` to keep `ats_url()`
+    round-trippable, mirroring the Workday `tenant:dc:site` pattern.
+    """
+    url = f"https://sjobs.brassring.com/TGnewUI/Search/Home/Home?partnerid={partnerid}&siteid={siteid}"
+    status = _http_head(url)
+    if status and 200 <= status < 400:
+        return {
+            "provider": "brassring", "slug": f"{partnerid}:{siteid}",
+            "total_jobs": None, "sample_titles": [],
+        }
+    return None
+
+
+def _icims_check(slug: str) -> dict | None:
+    """iCIMS careers tenant: typically `https://careers-<slug>.icims.com` (newer
+    portals) or `https://<slug>.icims.com` (older). Try both; first hit wins.
+    """
+    for prefix in (f"careers-{slug}", slug):
+        status = _http_head(f"https://{prefix}.icims.com/jobs/intro")
+        if status and 200 <= status < 400:
+            return {
+                "provider": "icims", "slug": prefix,
+                "total_jobs": None, "sample_titles": [],
+            }
+    return None
+
+
+def _phenom_check(slug: str) -> dict | None:
+    """Phenom People careers tenant: `https://<slug>.phenompeople.com/`."""
+    status = _http_head(f"https://{slug}.phenompeople.com/")
+    if status and 200 <= status < 400:
+        return {"provider": "phenom", "slug": slug, "total_jobs": None, "sample_titles": []}
+    return None
+
+
+def _taleo_check(slug: str) -> dict | None:
+    """Taleo careers tenant: `https://<slug>.taleo.net/careersection/...`."""
+    status = _http_head(f"https://{slug}.taleo.net/")
+    if status and 200 <= status < 400:
+        return {"provider": "taleo", "slug": slug, "total_jobs": None, "sample_titles": []}
+    return None
+
+
+def _oraclehcm_check(tenant: str, site_number: str) -> dict | None:
+    """Oracle HCM Cloud careers: URL pattern `https://<tenant>.fa.<region>.oraclecloud.com/...?siteNumber=<CX_NNNNN>`.
+    The `tenant` (e.g. `eqnt`, `e57u`) and `region` (e.g. `us2`) plus `siteNumber`
+    form the identifier triple. Slug stored as `tenant:siteNumber` — region is
+    inferred at URL-construction time (defaulting to `us2` is unreliable, so we
+    capture region too when present in the signature).
+    """
+    # Try a few common region segments since the signature regex may not capture region
+    for region in ("us2", "us6", "us1", "ca2", "em2"):
+        url = (f"https://{tenant}.fa.{region}.oraclecloud.com/hcmRestApi/resources/latest/"
+               f"recruitingCEJobRequisitions?onlyData=true&q=siteNumber={site_number}")
+        status = _http_head(url)
+        if status and 200 <= status < 400:
+            return {
+                "provider": "oraclehcm", "slug": f"{tenant}:{region}:{site_number}",
+                "total_jobs": None, "sample_titles": [],
+            }
+    return None
+
+
+def _workday_check(tenant: str, dc: str, site: str) -> dict | None:
+    """Validate a (tenant, dc, site) triple against the Workday cxs API.
+
+    Workday's job board lives at {tenant}.{dc}.myworkdayjobs.com/{site} and
+    exposes job listings via POST to /wday/cxs/{tenant}/{site}/jobs with a
+    JSON body. The dc segment is per-tenant (wd1/wd5/wd12/...) and isn't
+    derivable, so it must be carried alongside tenant+site.
+
+    Slug shape returned: 'tenant:dc:site' — round-trippable into ats_url().
+    """
+    api_url = f"https://{tenant}.{dc}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs"
+    data = _http_post_json(api_url, {"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": ""})
+    if not isinstance(data, dict):
+        return None
+    postings = data.get("jobPostings") or []
+    if not isinstance(postings, list):
+        return None
+    total = data.get("total") if isinstance(data.get("total"), int) else len(postings)
+    return {
+        "provider": "workday",
+        "slug": f"{tenant}:{dc}:{site}",
+        "total_jobs": total,
+        "sample_titles": [p.get("title", "") for p in postings[:5] if isinstance(p, dict)],
+    }
+
+
 _PROVIDER_CHECKS = {
     "ashby": _ashby_check,
     "greenhouse": _greenhouse_check,
     "lever": _lever_check,
+    "eightfold": _eightfold_check,
+    "avature": _avature_check,
+    "icims": _icims_check,
+    "phenom": _phenom_check,
+    "taleo": _taleo_check,
 }
 
 
 def _try_slug_candidates(name: str, website_url: str | None = None) -> dict | None:
-    """Run candidate slugs against Ashby → Greenhouse → Lever, first-hit-wins."""
-    candidates = _candidate_slugs(name, website_url)
+    """Run candidate slugs against Ashby → Greenhouse → Lever → Eightfold → Avature,
+    first-hit-wins.
+
+    Eightfold and Avature are checked AFTER the public-API trio because their
+    HEAD-only validation is cheaper than the API JSON checks, but they're prone
+    to wildcard subdomain false positives so we only try the base normalized
+    name (e.g. 'walmart' for 'Walmart', not 'walmartjobs' etc.). Catches Fortune
+    cos with JS-rendered careers pages where the eightfold/avature URL isn't in
+    the static HTML (Walmart, Morgan Stanley).
+
+    Filters known false-positive slugs (e.g. 'jobs', 'careers') before the API
+    call — Ashby has a generic 'jobs' board that catches any company whose URL
+    contains a `jobs.` subdomain (Walgreens, etc.) and produces wrong matches.
+    """
+    candidates = [s for s in _candidate_slugs(name, website_url) if not _is_false_positive_slug(s)]
     for provider in ("ashby", "greenhouse", "lever"):
         check = _PROVIDER_CHECKS[provider]
         for slug in candidates:
             hit = check(slug)
             if hit:
                 hit["tried_slugs"] = candidates
+                hit["found_via"] = "slug_candidates"
+                return hit
+    # Enterprise providers (Eightfold, Avature): subdomain pattern matches the
+    # normalized name. Try only the top 1-2 candidates — wildcard DNS on these
+    # platforms is rare but possible, so don't iterate every variant.
+    base_candidates = candidates[:2]
+    for provider in ("eightfold", "avature"):
+        check = _PROVIDER_CHECKS[provider]
+        for slug in base_candidates:
+            hit = check(slug)
+            if hit:
+                hit["tried_slugs"] = base_candidates
                 hit["found_via"] = "slug_candidates"
                 return hit
     return None
@@ -506,6 +1017,21 @@ _ATS_SIGNATURES: tuple[tuple[str, str], ...] = (
     ("jazzhr",     r"([a-zA-Z0-9_-]+)\.applytojob\.com"),
     ("teamtailor", r"([a-zA-Z0-9_-]+)\.teamtailor\.com"),
     ("comeet",     r"comeet\.co/(?:careers-api|jobs)/[^/]*?/?([A-Z0-9]+\.[0-9]+)"),
+    # Workday: 3 capture groups (tenant, dc, site). Optional locale segment
+    # like /en-US/ or /es/ between dc and site is skipped without capture.
+    ("workday",    r"([a-zA-Z0-9_-]+)\.(wd[0-9]+)\.myworkdayjobs\.com/(?:[a-z]{2}(?:-[A-Z]{2})?/)?([a-zA-Z0-9_-]+)"),
+    # Enterprise providers added 2026-05-13. Multi-group entries (brassring,
+    # oraclehcm) are handled specially in probe_website_for_ats — same shape
+    # as the Workday case.
+    ("eightfold",  r"([a-z0-9-]+)\.eightfold\.ai"),
+    ("avature",    r"([a-z0-9-]+)\.avature\.net"),
+    ("brassring",  r"sjobs\.brassring\.com[^\"'<>]*?partnerid=(\d+)[^\"'<>]*?siteid=(\d+)"),
+    ("phenom",     r"([a-z0-9-]+)\.phenompeople\.com"),
+    ("icims",      r"(?:careers-)?([a-z0-9-]+)\.icims\.com"),
+    ("taleo",      r"([a-z0-9-]+)\.taleo\.net"),
+    # Oracle HCM: 2 capture groups (tenant, siteNumber). Region is probed at
+    # check time since it's not always present in the URL we see embedded.
+    ("oraclehcm",  r"([a-z0-9-]+)\.fa\.[a-z0-9]+\.oraclecloud\.com[^\"'<>]*siteNumber=(CX_\d+)"),
 )
 
 
@@ -552,11 +1078,25 @@ def probe_website_for_ats(website_url: str) -> dict | None:
             continue
         for provider, pattern in _ATS_SIGNATURES:
             for m in re.finditer(pattern, html, re.IGNORECASE):
-                raw_slug = m.group(1).rstrip("/")
-                slug = unquote(raw_slug)
-                if _is_false_positive_slug(slug):
-                    continue
-                result = _validate_captured_slug(provider, slug)
+                if provider == "workday":
+                    tenant, dc, site = m.group(1), m.group(2), m.group(3)
+                    if _is_false_positive_slug(tenant):
+                        continue
+                    result = _workday_check(tenant, dc, site)
+                elif provider == "brassring":
+                    partnerid, siteid = m.group(1), m.group(2)
+                    result = _brassring_check(partnerid, siteid)
+                elif provider == "oraclehcm":
+                    tenant, site_no = m.group(1), m.group(2)
+                    if _is_false_positive_slug(tenant):
+                        continue
+                    result = _oraclehcm_check(tenant, site_no)
+                else:
+                    raw_slug = m.group(1).rstrip("/")
+                    slug = unquote(raw_slug)
+                    if _is_false_positive_slug(slug):
+                        continue
+                    result = _validate_captured_slug(provider, slug)
                 if result:
                     result["tried_slugs"] = [full_url]
                     result["found_via"] = "website_probe"
@@ -818,6 +1358,22 @@ def get_job_score(
     ).fetchone()
 
 
+def _compute_days_ago(date_str: str | None) -> int | None:
+    """Recompute days_ago live from a stored posted_date (YYYY-MM-DD).
+
+    Used by the dashboard payload so the 'days posted ago' stat reflects
+    today, not whatever was frozen in raw_json at scout time.
+    """
+    if not date_str:
+        return None
+    try:
+        import datetime as _dt
+        d = _dt.date.fromisoformat(date_str[:10])
+        return (_dt.date.today() - d).days
+    except Exception:
+        return None
+
+
 def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
     """Return the legacy job dictionary shape expected by matchers/dashboard."""
     try:
@@ -834,6 +1390,8 @@ def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
     job["location_raw"] = row["location_raw"] or raw.get("location_raw", "")
     job["remote_ok"] = bool(row["remote_ok"])
     job["posted_date"] = row["posted_date"] or raw.get("posted_date", "")
+    # Live recompute from posted_date — raw_json's days_ago is frozen at scout time.
+    job["days_ago"] = _compute_days_ago(job["posted_date"])
     job["company_stage"] = row["stage"] or raw.get("company_stage", "Unknown")
     job["industry_vertical"] = row["vertical"] or raw.get("industry_vertical", "Unknown")
     job["jd_text"] = row["jd_text"] or raw.get("jd_text", "")
@@ -1042,6 +1600,8 @@ def update_job_interaction(
     selected: bool | None = None,
     reviewed: bool | None = None,
     applied: bool | None = None,
+    reached_out: bool | None = None,
+    no_outreach: bool | None = None,
     comment: str | None = None,
     tags: list[Any] | None = None,
     manual_score: int | None = None,
@@ -1066,6 +1626,12 @@ def update_job_interaction(
     if applied is not None:
         updates.append("applied = ?")
         values.append(int(applied))
+    if reached_out is not None:
+        updates.append("reached_out = ?")
+        values.append(int(reached_out))
+    if no_outreach is not None:
+        updates.append("no_outreach = ?")
+        values.append(int(no_outreach))
     if comment is not None:
         updates.append("comment = ?")
         values.append(comment)
@@ -1109,6 +1675,8 @@ def export_dashboard_state(conn: sqlite3.Connection) -> dict[str, Any]:
             i.selected,
             i.reviewed,
             i.applied,
+            i.reached_out,
+            i.no_outreach,
             i.comment,
             i.tags_json,
             i.manual_score,
@@ -1140,10 +1708,13 @@ def export_dashboard_state(conn: sqlite3.Connection) -> dict[str, Any]:
             }
         if row["selected"]:
             selected.append(key)
-        if row["reviewed"] or row["applied"]:
+        if row["reviewed"] or row["applied"] or row["reached_out"] or row["no_outreach"]:
             job_status[key] = {
                 "reviewed": bool(row["reviewed"]),
                 "applied": bool(row["applied"]),
+                "reached_out": bool(row["reached_out"]),
+                "no_outreach": bool(row["no_outreach"]),
+                "updated_at": row["updated_at"],
             }
         if row["manual_score"] is not None or row["manual_score_comment"]:
             feedback[key] = {
@@ -1244,7 +1815,7 @@ def load_scout_companies(conn: sqlite3.Connection) -> list[dict[str, str]]:
             COALESCE(c.vertical, 'SaaS') AS vertical
         FROM ats_endpoints e
         JOIN companies c ON c.id = e.company_id
-        WHERE e.provider IN ('ashby', 'greenhouse', 'lever', 'broken', 'tavily')
+        WHERE e.provider IN ('ashby', 'greenhouse', 'lever', 'workday', 'broken', 'tavily')
           AND e.status IN ('active', 'skipped')
           AND (
               c.active = 1

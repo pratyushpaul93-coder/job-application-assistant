@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>pp-jobapp · pipeline</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { padding: 0; }
+  /* --- Header --------------------------------------------------------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: saturate(180%) blur(10px);
+    border-bottom: 1px solid var(--c-border);
+  }
+  .topbar__inner {
+    max-width: var(--layout-max); margin: 0 auto;
+    padding: var(--s-3) var(--layout-gutter);
+    display: flex; align-items: center; gap: var(--s-4);
+  }
+  .brand {
+    font-size: var(--fs-md); font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-tight);
+    display: flex; align-items: center; gap: var(--s-2);
+  }
+  .brand__dot { width: 10px; height: 10px; background: var(--c-accent); border-radius: 3px; transform: rotate(45deg); }
+  .nav { display: flex; gap: var(--s-1); margin-left: var(--s-6); }
+  .nav__link {
+    padding: 6px var(--s-3); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+    color: var(--c-text-2); border-radius: var(--r-md); cursor: pointer;
+    transition: background var(--t-fast), color var(--t-fast);
+  }
+  .nav__link:hover { background: var(--c-surface-2); color: var(--c-text); }
+  .nav__link.is-active { background: var(--c-surface-2); color: var(--c-text); }
+  .topbar__spacer { flex: 1; }
+  .topbar__meta { font-size: var(--fs-xs); color: var(--c-text-3); display: flex; gap: var(--s-3); }
+  .topbar__meta strong { color: var(--c-text-2); font-weight: var(--fw-medium); }
+
+  /* --- Page layout ---------------------------------------------------- */
+  .page { max-width: var(--layout-max); margin: 0 auto; padding: var(--s-8) var(--layout-gutter) var(--s-12); }
+  .page-header { margin-bottom: var(--s-8); }
+  .page-header h1 {
+    font-size: var(--fs-2xl); font-weight: var(--fw-semibold);
+    letter-spacing: -0.02em; margin-bottom: var(--s-2);
+  }
+  .page-header__sub { color: var(--c-text-2); font-size: var(--fs-md); }
+
+  /* --- KPI cards ------------------------------------------------------ */
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: var(--s-3); margin-bottom: var(--s-8);
+  }
+  .kpi {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    padding: var(--s-4) var(--s-5);
+    box-shadow: var(--sh-1);
+  }
+  .kpi__label {
+    font-size: var(--fs-xs); color: var(--c-text-3);
+    text-transform: uppercase; letter-spacing: var(--tracking-wide);
+    font-weight: var(--fw-medium);
+  }
+  .kpi__value {
+    margin-top: var(--s-2);
+    font-size: 26px; font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-tight);
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi__delta { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); font-weight: var(--fw-medium); margin-left: var(--s-2); }
+  .kpi__delta--up { color: var(--c-success-text); }
+  .kpi__delta--down { color: var(--c-danger-text); }
+
+  /* --- Funnel chart --------------------------------------------------- */
+  .funnel-card { padding: var(--s-6); margin-bottom: var(--s-8); }
+  .funnel-card__head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: var(--s-5);
+  }
+  .funnel-card__title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+  .funnel-card__legend {
+    display: flex; gap: var(--s-4); font-size: var(--fs-xs); color: var(--c-text-3);
+  }
+  .funnel-card__legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .funnel-card__legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  .funnel-stage {
+    display: grid;
+    grid-template-columns: 220px 1fr 110px;
+    gap: var(--s-4);
+    padding: var(--s-3) 0;
+    align-items: center;
+  }
+  .funnel-stage + .funnel-stage { border-top: 1px solid var(--c-border); }
+  .funnel-stage__label { display: flex; flex-direction: column; gap: 2px; }
+  .funnel-stage__name {
+    font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--c-text);
+  }
+  .funnel-stage__source {
+    font-family: var(--font-mono);
+    font-size: 10.5px; color: var(--c-text-3);
+    line-height: 1.4;
+  }
+  .funnel-stage__bar {
+    position: relative; height: 28px;
+    background: var(--c-surface-2);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+  }
+  .funnel-stage__fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--c-accent) 0%, var(--c-accent-hover) 100%);
+    border-radius: var(--r-sm);
+    transition: width var(--t-slow);
+  }
+  .funnel-stage__fill--alt {
+    background: linear-gradient(90deg, #7e7eea 0%, #6b6be0 100%);
+  }
+  .funnel-stage__count {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--fs-md); font-weight: var(--fw-semibold);
+    color: var(--c-text);
+    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  }
+  .funnel-stage__delta {
+    font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  }
+  .funnel-stage__delta--neutral { color: var(--c-text-3); }
+  .funnel-stage__delta--warn    { color: var(--c-warn-text); }
+  .funnel-stage__delta--danger  { color: var(--c-danger-text); }
+  .funnel-stage__delta--success { color: var(--c-success-text); }
+
+  /* Stage section divider (companies → jobs) */
+  .funnel-divider {
+    margin: var(--s-3) 0;
+    padding-left: 220px;
+    display: flex; align-items: center; gap: var(--s-3);
+    color: var(--c-text-3); font-size: var(--fs-xs);
+    text-transform: uppercase; letter-spacing: var(--tracking-wide);
+    font-weight: var(--fw-medium);
+  }
+  .funnel-divider::before,
+  .funnel-divider::after { content: ''; flex: 1; height: 1px; background: var(--c-border); }
+
+  /* --- Two-column layout for tables ----------------------------------- */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  .data-card { padding: var(--s-5) var(--s-6); }
+  .data-card__head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: var(--s-3);
+  }
+  .data-card__title { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+  .data-card__hint { font-size: var(--fs-xs); color: var(--c-text-3); }
+
+  /* Inline sparkbar inside table cells */
+  .spark {
+    display: inline-block;
+    width: 80px; height: 6px;
+    background: var(--c-surface-2);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+    vertical-align: middle;
+    margin-right: var(--s-2);
+  }
+  .spark__fill {
+    height: 100%; background: var(--c-accent); border-radius: var(--r-pill);
+  }
+
+  .gap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); }
+  .gap {
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    padding: var(--s-3) var(--s-4);
+  }
+  .gap__label { font-size: var(--fs-xs); color: var(--c-text-3); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+  .gap__value { font-size: var(--fs-xl); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+</style>
+</head>
+<body>
+
+<!-- ============ TOPBAR ============ -->
+<header class="topbar">
+  <div class="topbar__inner">
+    <div class="brand"><span class="brand__dot"></span> pp-jobapp</div>
+    <nav class="nav">
+      <a class="nav__link is-active">Pipeline</a>
+      <a class="nav__link">Companies</a>
+      <a class="nav__link">Matching jobs</a>
+      <a class="nav__link">Manual tailor</a>
+    </nav>
+    <div class="topbar__spacer"></div>
+    <div class="topbar__meta">
+      <span>Last scout · <strong>2 min ago</strong></span>
+      <span>Last matcher · <strong>3 days ago</strong></span>
+    </div>
+    <button class="btn btn--primary btn--sm">Run scout</button>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- ============ PAGE HEADER ============ -->
+  <header class="page-header">
+    <h1>Pipeline</h1>
+    <p class="page-header__sub">Where the funnel collapses, and which companies and providers carry the weight.</p>
+  </header>
+
+  <!-- ============ KPI TILES ============ -->
+  <section class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi__label">Active companies</div>
+      <div class="kpi__value">5,910</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Working ATS</div>
+      <div class="kpi__value">1,879 <span class="kpi__delta kpi__delta--up">+24 this week</span></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Jobs scraped</div>
+      <div class="kpi__value">2,136</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Matched ≥ 3</div>
+      <div class="kpi__value">450 <span class="kpi__delta kpi__delta--down">−12 vs last run</span></div>
+    </div>
+  </section>
+
+  <!-- ============ FUNNEL ============ -->
+  <section class="card funnel-card">
+    <div class="funnel-card__head">
+      <h2 class="funnel-card__title">Funnel · companies to matched jobs</h2>
+      <div class="funnel-card__legend">
+        <span><i style="background:var(--c-accent)"></i> Company stages</span>
+        <span><i style="background:#7e7eea"></i> Job stages</span>
+      </div>
+    </div>
+
+    <!-- Stage 1: Active companies (max = 5910) -->
+    <div class="funnel-stage">
+      <div class="funnel-stage__label">
+        <div class="funnel-stage__name">Active companies</div>
+        <div class="funnel-stage__source">companies WHERE active=1</div>
+      </div>
+      <div class="funnel-stage__bar"><div class="funnel-stage__fill" style="width:100%"></div></div>
+      <div class="funnel-stage__count">
+        <span>5,910</span>
+        <span class="funnel-stage__delta funnel-stage__delta--neutral">baseline</span>
+      </div>
+    </div>
+
+    <!-- Stage 2: With website URL (3595 / 5910 = 60.8%) -->
+    <div class="funnel-stage">
+      <div class="funnel-stage__label">
+        <div class="funnel-stage__name">With website URL</div>
+        <div class="funnel-stage__source">+ website_url IS NOT NULL</div>
+      </div>
+      <div class="funnel-stage__bar"><div class="funnel-stage__fill" style="width:60.8%"></div></div>
+      <div class="funnel-stage__count">
+        <span>3,595</span>
+        <span class="funnel-stage__delta funnel-stage__delta--warn">−39% retained 61%</span>
+      </div>
+    </div>
+
+    <!-- Stage 3: With working ATS (1879 / 3595 = 52.3%) -->
+    <div class="funnel-stage">
+      <div class="funnel-stage__label">
+        <div class="funnel-stage__name">With ≥1 working ATS</div>
+        <div class="funnel-stage__source">+ ats_endpoints.status='active'</div>
+      </div>
+      <div class="funnel-stage__bar"><div class="funnel-stage__fill" style="width:31.8%"></div></div>
+      <div class="funnel-stage__count">
+        <span>1,879</span>
+        <span class="funnel-stage__delta funnel-stage__delta--warn">−48% retained 52%</span>
+      </div>
+    </div>
+
+    <div class="funnel-divider">Companies&nbsp;→&nbsp;Jobs</div>
+
+    <!-- Stage 4: Jobs scraped (2136) — separate scale -->
+    <div class="funnel-stage">
+      <div class="funnel-stage__label">
+        <div class="funnel-stage__name">Jobs scraped</div>
+        <div class="funnel-stage__source">COUNT(*) FROM job_postings</div>
+      </div>
+      <div class="funnel-stage__bar"><div class="funnel-stage__fill funnel-stage__fill--alt" style="width:100%"></div></div>
+      <div class="funnel-stage__count">
+        <span>2,136</span>
+        <span class="funnel-stage__delta funnel-stage__delta--neutral">avg 1.1 / co.</span>
+      </div>
+    </div>
+
+    <!-- Stage 5: Jobs scored (2136 / 2136 = 100%) -->
+    <div class="funnel-stage">
+      <div class="funnel-stage__label">
+        <div class="funnel-stage__name">Jobs scored</div>
+        <div class="funnel-stage__source">scorer='current_shortlist'</div>
+      </div>
+      <div class="funnel-stage__bar"><div class="funnel-stage__fill funnel-stage__fill--alt" style="width:100%"></div></div>
+      <div class="funnel-stage__count">
+        <span>2,136</span>
+        <span class="funnel-stage__delta funnel-stage__delta--success">100% scored</span>
+      </div>
+    </div>
+
+    <!-- Stage 6: Matched (450 / 2136 = 21.1%) -->
+    <div class="funnel-stage">
+      <div class="funnel-stage__label">
+        <div class="funnel-stage__name">Matched ≥ 3</div>
+        <div class="funnel-stage__source">score >= 3 on current rubric</div>
+      </div>
+      <div class="funnel-stage__bar"><div class="funnel-stage__fill funnel-stage__fill--alt" style="width:21.1%"></div></div>
+      <div class="funnel-stage__count">
+        <span>450</span>
+        <span class="funnel-stage__delta funnel-stage__delta--danger">−79% retained 21%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GAP TILES ============ -->
+  <section style="margin-bottom: var(--s-8)">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:var(--s-3)">
+      <h3 style="font-size:var(--fs-md); font-weight:var(--fw-semibold)">Where companies fall out of the ATS funnel</h3>
+      <span class="subtle" style="font-size:var(--fs-xs)">have website_url, no active ats_endpoint</span>
+    </div>
+    <div class="gap-grid">
+      <div class="gap">
+        <div class="gap__label">Probed · not found</div>
+        <div class="gap__value">2,141</div>
+        <div class="subtle" style="font-size:var(--fs-xs); margin-top:var(--s-1)">No public ATS detected on any common provider.</div>
+      </div>
+      <div class="gap">
+        <div class="gap__label">Never probed</div>
+        <div class="gap__value">50</div>
+        <div class="subtle" style="font-size:var(--fs-xs); margin-top:var(--s-1)">Awaiting next scout pass.</div>
+      </div>
+      <div class="gap">
+        <div class="gap__label">Skipped</div>
+        <div class="gap__value">3</div>
+        <div class="subtle" style="font-size:var(--fs-xs); margin-top:var(--s-1)">Manually deferred (login wall, etc.).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TWO-COL: providers + top companies ============ -->
+  <section class="two-col">
+
+    <!-- Providers -->
+    <div class="card data-card">
+      <div class="data-card__head">
+        <div class="data-card__title">ATS providers · working endpoints</div>
+        <div class="data-card__hint">by company count</div>
+      </div>
+      <table class="table">
+        <thead>
+          <tr><th>Provider</th><th class="num">Companies</th><th class="num">Share</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="badge badge--neutral">Greenhouse</span></td><td class="num">762</td><td class="num"><span class="spark"><span class="spark__fill" style="width:100%"></span></span>41%</td></tr>
+          <tr><td><span class="badge badge--neutral">Ashby</span></td><td class="num">698</td><td class="num"><span class="spark"><span class="spark__fill" style="width:91.6%"></span></span>37%</td></tr>
+          <tr><td><span class="badge badge--neutral">Lever</span></td><td class="num">208</td><td class="num"><span class="spark"><span class="spark__fill" style="width:27.3%"></span></span>11%</td></tr>
+          <tr><td><span class="badge badge--neutral">Workday</span></td><td class="num">177</td><td class="num"><span class="spark"><span class="spark__fill" style="width:23.2%"></span></span>9%</td></tr>
+          <tr><td><span class="badge badge--neutral">Workable</span></td><td class="num">14</td><td class="num"><span class="spark"><span class="spark__fill" style="width:1.8%"></span></span>0.7%</td></tr>
+          <tr><td><span class="badge badge--neutral">BambooHR</span></td><td class="num">6</td><td class="num"><span class="spark"><span class="spark__fill" style="width:0.8%"></span></span>0.3%</td></tr>
+          <tr><td><span class="badge badge--neutral">Other (5)</span></td><td class="num">14</td><td class="num"><span class="spark"><span class="spark__fill" style="width:1.8%"></span></span>0.7%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Top companies -->
+    <div class="card data-card">
+      <div class="data-card__head">
+        <div class="data-card__title">Top companies · matched jobs</div>
+        <div class="data-card__hint">scorer · current_shortlist</div>
+      </div>
+      <table class="table">
+        <thead>
+          <tr><th>Company</th><th class="num">Jobs</th><th class="num">Share</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Anthropic</td><td class="num">12</td><td class="num"><span class="spark"><span class="spark__fill" style="width:100%"></span></span></td></tr>
+          <tr><td>EliseAI</td><td class="num">12</td><td class="num"><span class="spark"><span class="spark__fill" style="width:100%"></span></span></td></tr>
+          <tr><td>Anduril</td><td class="num">10</td><td class="num"><span class="spark"><span class="spark__fill" style="width:83%"></span></span></td></tr>
+          <tr><td>OpenAI</td><td class="num">10</td><td class="num"><span class="spark"><span class="spark__fill" style="width:83%"></span></span></td></tr>
+          <tr><td>Samsara</td><td class="num">9</td><td class="num"><span class="spark"><span class="spark__fill" style="width:75%"></span></span></td></tr>
+          <tr><td>Scale AI</td><td class="num">9</td><td class="num"><span class="spark"><span class="spark__fill" style="width:75%"></span></span></td></tr>
+          <tr><td>Glean</td><td class="num">8</td><td class="num"><span class="spark"><span class="spark__fill" style="width:67%"></span></span></td></tr>
+          <tr><td>Harvey</td><td class="num">8</td><td class="num"><span class="spark"><span class="spark__fill" style="width:67%"></span></span></td></tr>
+          <tr><td>Pinterest</td><td class="num">7</td><td class="num"><span class="spark"><span class="spark__fill" style="width:58%"></span></span></td></tr>
+          <tr><td>Whatnot</td><td class="num">7</td><td class="num"><span class="spark"><span class="spark__fill" style="width:58%"></span></span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

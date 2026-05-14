@@ -10,6 +10,11 @@ SCRIPTS_DIR = '/root/pp-jobapp/scripts'
 DB_PATH = os.path.join(WORKSPACE, 'jobapp.db')
 sys.path.insert(0, SCRIPTS_DIR)
 import storage
+from keys import get_anthropic_key
+from ats_matcher import SCORER  # 'current_shortlist' (defined ats_matcher.py:52)
+# Threshold isn't centralized; matcher hardcodes >=3 at ats_matcher.py:187,
+# storage.export_dashboard_payload defaults min_score=3 (storage.py:892).
+MIN_MATCH_SCORE = 3
 
 _VC_LABELS = {
     'accel': 'Accel',
@@ -90,6 +95,36 @@ def _lookup_resume_meta(txt_filename):
         conn.close()
     return None, None
 
+def _canonical_tailor_filename(role_title, company_name, version=""):
+    """Mirror tailor.py's <YYYY-MM-DD>_<slug>[_<version>].txt construction."""
+    slug = (role_title + "_" + company_name).lower().replace(" ", "_").replace("/", "_")[:50]
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    suffix = ("_" + version) if version else ""
+    return f"{date_str}_{slug}{suffix}.txt"
+
+def _refresh_standardized_snapshot(txt_filename, company, role):
+    """Copy canonical <date>_<slug>.txt to PPaul_<date>_<company>_<role>.txt and rebuild
+    its PDF, so the Download link always serves the latest tailor/revise output.
+    Returns the new PDF basename on success, None otherwise."""
+    import subprocess as sp, shutil
+    if not company or not role:
+        return None
+    txt_path = _tailored_path(txt_filename, {".txt"})
+    if not txt_path or not os.path.exists(txt_path):
+        return None
+    new_base = _resume_filename(company, role, ext="")
+    new_txt_path = os.path.join(TAILORED_DIR, new_base + ".txt")
+    new_pdf_path = os.path.join(TAILORED_DIR, new_base + ".pdf")
+    try:
+        shutil.copy2(txt_path, new_txt_path)
+        sp.run(
+            ["python3", "/root/pp-jobapp/scripts/generate_pdf.py", new_txt_path, new_pdf_path],
+            capture_output=True, text=True, timeout=60,
+        )
+    except Exception:
+        return None
+    return new_base + ".pdf"
+
 def _tailored_path(filename, allowed_exts=None):
     """Resolve a user-provided tailored-resume filename inside TAILORED_DIR."""
     filename = (filename or "").strip()
@@ -134,6 +169,21 @@ def _require_db():
 @app.route('/')
 def index():
     return open('/root/pp-jobapp/scripts/dashboard_ui.html').read()
+
+DESIGNS_DIR = '/root/pp-jobapp/designs'
+
+@app.route('/designs/')
+@app.route('/designs/<path:filename>')
+def designs(filename='index.html'):
+    """Serve design-mockup HTML/CSS for in-browser review. Read-only, scoped to designs/."""
+    from flask import send_from_directory, abort
+    safe = safe_join(DESIGNS_DIR, filename)
+    if not safe or not os.path.isfile(safe):
+        abort(404)
+    base = os.path.abspath(DESIGNS_DIR)
+    if os.path.commonpath([base, os.path.abspath(safe)]) != base:
+        abort(404)
+    return send_from_directory(DESIGNS_DIR, filename)
 
 @app.route('/api/data')
 def data():
@@ -225,8 +275,8 @@ def job_status():
     key = d.get("key", "")
     field = d.get("field", "")
     value = d.get("value", False)
-    if not key or field not in ("reviewed", "applied"):
-        return jsonify({"error": "key and field (reviewed|applied) required"}), 400
+    if not key or field not in ("reviewed", "applied", "reached_out", "no_outreach"):
+        return jsonify({"error": "key and field (reviewed|applied|reached_out|no_outreach) required"}), 400
     conn = _require_db()
     try:
         storage.update_job_interaction(conn, key, **{field: bool(value)})
@@ -249,18 +299,35 @@ def scan():
     return jsonify({"ok": True})
 @app.route("/api/tailor", methods=["POST"])
 def tailor_route():
-    d = request.json
+    return _run_tailor(request.json or {}, comments="")
+
+@app.route("/api/regenerate", methods=["POST"])
+def regenerate_route():
+    """Re-run tailor.py with the user's comments injected. Same model (Sonnet 4.6)
+    as the initial Tailor flow; differs only in that the comment text is added
+    to the prompt as USER GUIDANCE."""
+    d = request.json or {}
+    comments = (d.get("comments") or "").strip()
+    return _run_tailor(d, comments=comments)
+
+def _run_tailor(d, *, comments=""):
     status_path = os.path.join(WORKSPACE, "tailor_status.json")
     import datetime as dt
     json.dump({"status": "running", "role": d.get("role_title",""), "company": d.get("company_name",""), "started": str(dt.datetime.now())}, open(status_path, "w"))
     def run():
         import subprocess as sp
-        result = sp.run(["python3", "/root/pp-jobapp/scripts/tailor.py", d.get("job_url",""), d.get("role_title",""), d.get("company_name","")], capture_output=True, text=True, timeout=120)
+        role = d.get("role_title","")
+        company = d.get("company_name","")
+        cmd = ["python3", "/root/pp-jobapp/scripts/tailor.py", d.get("job_url",""), role, company]
+        if comments:
+            cmd += ["--comments", comments]
+        result = sp.run(cmd, capture_output=True, text=True, timeout=120)
         import datetime as dt2
         if result.returncode == 0:
-            json.dump({"status": "done", "role": d.get("role_title",""), "company": d.get("company_name","")}, open(status_path, "w"))
+            _refresh_standardized_snapshot(_canonical_tailor_filename(role, company), company, role)
+            json.dump({"status": "done", "role": role, "company": company}, open(status_path, "w"))
         else:
-            json.dump({"status": "error", "error": result.stderr[:300]}, open(status_path, "w"))
+            json.dump({"status": "error", "error": (result.stderr or result.stdout)[-300:]}, open(status_path, "w"))
     threading.Thread(target=run, daemon=True).start()
     return jsonify({"ok": True})
 
@@ -286,6 +353,131 @@ def scan_status():
     p = os.path.join(WORKSPACE, "scan_status.json")
     return jsonify(json.load(open(p)) if os.path.exists(p) else {"status": "idle"})
 
+
+@app.route("/api/pipeline")
+def pipeline():
+    """Read-only state-of-the-pipeline payload for the Pipeline tab."""
+    conn = _require_db()
+    try:
+        cur = conn.cursor()
+
+        total_active = cur.execute(
+            "SELECT COUNT(*) AS n FROM companies WHERE active=1"
+        ).fetchone()["n"]
+
+        with_url = cur.execute(
+            "SELECT COUNT(*) AS n FROM companies "
+            "WHERE active=1 AND website_url IS NOT NULL AND website_url != ''"
+        ).fetchone()["n"]
+
+        with_active_ats = cur.execute(
+            "SELECT COUNT(DISTINCT ae.company_id) AS n "
+            "FROM ats_endpoints ae JOIN companies c ON c.id = ae.company_id "
+            "WHERE c.active=1 AND ae.status='active'"
+        ).fetchone()["n"]
+
+        total_jobs = cur.execute(
+            "SELECT COUNT(*) AS n FROM job_postings"
+        ).fetchone()["n"]
+
+        scored_jobs = cur.execute(
+            "SELECT COUNT(DISTINCT job_id) AS n FROM job_scores WHERE scorer = ?",
+            (SCORER,),
+        ).fetchone()["n"]
+
+        matched_jobs = cur.execute(
+            "SELECT COUNT(DISTINCT job_id) AS n FROM job_scores "
+            "WHERE scorer = ? AND score >= ?",
+            (SCORER, MIN_MATCH_SCORE),
+        ).fetchone()["n"]
+
+        # Section 2: companies with website_url but no working ATS endpoint
+        gap_rows = cur.execute(
+            """
+            WITH cand AS (
+              SELECT c.id FROM companies c
+              WHERE c.active=1
+                AND c.website_url IS NOT NULL AND c.website_url != ''
+                AND NOT EXISTS (
+                  SELECT 1 FROM ats_endpoints ae
+                  WHERE ae.company_id=c.id AND ae.status='active'
+                )
+            )
+            SELECT
+              CASE WHEN ae.status IS NULL THEN 'never_probed' ELSE ae.status END AS bucket,
+              COUNT(DISTINCT c.id) AS n
+            FROM cand c LEFT JOIN ats_endpoints ae ON ae.company_id = c.id
+            GROUP BY bucket ORDER BY n DESC
+            """
+        ).fetchall()
+        gap = [{"status": r["bucket"], "count": r["n"]} for r in gap_rows]
+
+        # Section 3: working ATS endpoints by provider
+        prov_rows = cur.execute(
+            """
+            SELECT ae.provider AS provider, COUNT(DISTINCT ae.company_id) AS n
+            FROM ats_endpoints ae JOIN companies c ON c.id = ae.company_id
+            WHERE c.active=1 AND ae.status='active'
+            GROUP BY ae.provider ORDER BY n DESC
+            """
+        ).fetchall()
+        providers = [{"provider": r["provider"], "count": r["n"]} for r in prov_rows]
+
+        # Section 4: top companies by matched jobs
+        top_rows = cur.execute(
+            """
+            SELECT c.canonical_name AS name, COUNT(DISTINCT j.id) AS n
+            FROM job_scores s
+            JOIN job_postings j ON j.id = s.job_id
+            JOIN companies c ON c.id = j.company_id
+            WHERE s.scorer = ? AND s.score >= ?
+            GROUP BY c.id ORDER BY n DESC, c.canonical_name LIMIT 15
+            """,
+            (SCORER, MIN_MATCH_SCORE),
+        ).fetchall()
+        top_companies = [{"name": r["name"], "count": r["n"]} for r in top_rows]
+
+        # Section 5: last-run timestamps
+        last_scout = cur.execute(
+            "SELECT MAX(updated_at) AS t FROM ats_endpoints"
+        ).fetchone()["t"]
+        last_match = cur.execute(
+            "SELECT MAX(scored_at) AS t FROM job_scores WHERE scorer = ?",
+            (SCORER,),
+        ).fetchone()["t"]
+    finally:
+        conn.close()
+
+    funnel = [
+        {"stage": "Active companies",
+         "count": total_active, "source": "companies WHERE active=1"},
+        {"stage": "With website_url",
+         "count": with_url,
+         "source": "companies WHERE active=1 AND website_url IS NOT NULL AND != ''"},
+        {"stage": "With ≥1 working ATS endpoint",
+         "count": with_active_ats,
+         "source": "DISTINCT ats_endpoints.company_id WHERE status='active'"},
+        {"stage": "Jobs scraped",
+         "count": total_jobs, "source": "COUNT(*) FROM job_postings"},
+        {"stage": "Jobs scored",
+         "count": scored_jobs,
+         "source": f"DISTINCT job_id FROM job_scores WHERE scorer='{SCORER}'"},
+        {"stage": f"Jobs above threshold (≥{MIN_MATCH_SCORE})",
+         "count": matched_jobs,
+         "source": f"... AND score >= {MIN_MATCH_SCORE}"},
+    ]
+
+    return jsonify({
+        "funnel": funnel,
+        "gap": gap,
+        "providers": providers,
+        "top_companies": top_companies,
+        "last_scout": last_scout,
+        "last_matcher": last_match,
+        "scorer": SCORER,
+        "min_match_score": MIN_MATCH_SCORE,
+    })
+
 @app.route("/api/tailored_resume_content")
 def tailored_resume_content():
     filename = request.args.get("file", "")
@@ -310,8 +502,7 @@ def revise():
     if not os.path.exists(filepath):
         return jsonify({"error": "file not found"}), 404
     current_content = open(filepath).read()
-    cfg = json.load(open("/root/.openclaw/openclaw.json"))
-    api_key = json.load(open("/root/.openclaw/agents/job-scout/auth-profiles.json")).get("profiles",{}).get("anthropic:default",{}).get("key","")
+    api_key = get_anthropic_key()
     import urllib.request
     prompt = (
         "You are editing a tailored resume for Pratyush Paul.\n\n"
@@ -335,6 +526,8 @@ def revise():
         resp = json.loads(r.read().decode())
         revised = resp["content"][0]["text"]
     open(filepath, "w").write(revised)
+    company, role = _lookup_resume_meta(filename)
+    _refresh_standardized_snapshot(filename, company, role)
     return jsonify({"ok": True, "content": revised})
 
 @app.route("/api/generate_pdf", methods=["POST"])
@@ -570,6 +763,10 @@ def tailor_manual():
                 _os.unlink(tmp.name)
 
             if result.returncode == 0:
+                _refresh_standardized_snapshot(
+                    _canonical_tailor_filename(role_title, company_name, version),
+                    company_name, role_title,
+                )
                 json.dump({"status": "done", "role": role_title, "company": company_name},
                           open(status_path, "w"))
             else:
@@ -624,6 +821,200 @@ def bash_status():
     if job_id not in bash_jobs:
         return jsonify({"status": "error", "output": "job_id not found"}), 404
     return jsonify(bash_jobs[job_id])
+
+
+# ── Outreach drafts ───────────────────────────────────────────────
+# Drafts a ~250-word outreach message in Pratyush's voice for an applied job,
+# using Anthropic's native web_search tool to ground the company paragraph.
+# Synchronous: the round-trip takes ~30-60s; the UI shows a spinner.
+
+@app.route("/api/outreach/draft", methods=["POST"])
+def outreach_draft_route():
+    """Generate 2 outreach variants for a job. Optional `slants` overrides auto-selection."""
+    from outreach.drafter import generate_variants, DEFAULT_MODEL, OPUS_MODEL
+    from outreach.budget import BudgetExceeded
+    d = request.json or {}
+    try:
+        job_id = int(d.get("job_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "job_id required (int)"}), 400
+    if not job_id:
+        return jsonify({"error": "job_id required"}), 400
+    model = OPUS_MODEL if d.get("use_opus") else DEFAULT_MODEL
+    slants = d.get("slants") or None
+    try:
+        payload = generate_variants(job_id, slants=slants, model=model)
+        return jsonify(payload)
+    except BudgetExceeded as e:
+        return jsonify({"error": str(e), "kind": "budget_exceeded"}), 429
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route("/api/outreach/slants", methods=["GET"])
+def outreach_slants_route():
+    from outreach.drafter import list_slants
+    return jsonify({"slants": list_slants()})
+
+
+@app.route("/api/outreach/research", methods=["POST"])
+def outreach_research_route():
+    """Standalone research step. Splits the old draft flow's "research + compose"
+    into two clicks so the user can let the per-minute rate-limit window clear
+    between the (expensive) research call and the compose calls.
+
+    Body: {job_id, peek?: bool, force_refresh?: bool, use_opus?: bool}
+      - peek=true → cache-only check; no API call. Returns metadata or 404.
+      - force_refresh=true → re-run research even if cached.
+      - default → cache-or-run.
+    """
+    from outreach.drafter import (
+        _fetch_job_context, peek_research, get_or_research_company,
+        DEFAULT_MODEL, OPUS_MODEL,
+    )
+    from outreach.budget import BudgetExceeded
+    d = request.json or {}
+    try:
+        job_id = int(d.get("job_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "job_id required (int)"}), 400
+    if not job_id:
+        return jsonify({"error": "job_id required"}), 400
+    ctx = _fetch_job_context(job_id)
+    if not ctx:
+        return jsonify({"error": f"job_id {job_id} not found"}), 404
+    if d.get("peek"):
+        info = peek_research(ctx["company_id"])
+        if not info:
+            return jsonify({"cached": False, "company": ctx["company"]}), 200
+        info["cached"] = True
+        info["company"] = ctx["company"]
+        return jsonify(info)
+    model = OPUS_MODEL if d.get("use_opus") else DEFAULT_MODEL
+    try:
+        payload = get_or_research_company(ctx, model=model, force_refresh=bool(d.get("force_refresh")))
+        return jsonify({
+            "from_cache": payload.get("from_cache", False),
+            "fetched_at": payload.get("fetched_at"),
+            "sources_count": len(payload.get("sources", [])),
+            "cost_usd": 0.0 if payload.get("from_cache") else payload.get("cost_usd", 0.0),
+            "model": payload.get("model"),
+            "company": ctx["company"],
+        })
+    except BudgetExceeded as e:
+        return jsonify({"error": str(e), "kind": "budget_exceeded"}), 429
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route("/api/outreach/recompose", methods=["POST"])
+def outreach_recompose_route():
+    """Replace a single existing draft's content with a fresh compose using a
+    new slant. Preserves draft_id + variant_group_id; the sibling variant in
+    the same group is untouched. Research is loaded from cache when fresh."""
+    from outreach.drafter import recompose_variant, DEFAULT_MODEL, OPUS_MODEL
+    from outreach.budget import BudgetExceeded
+    d = request.json or {}
+    try:
+        draft_id = int(d.get("draft_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "draft_id required (int)"}), 400
+    slant = (d.get("slant") or "").strip()
+    if not draft_id or not slant:
+        return jsonify({"error": "draft_id and slant required"}), 400
+    model = OPUS_MODEL if d.get("use_opus") else DEFAULT_MODEL
+    try:
+        payload = recompose_variant(draft_id, slant=slant, model=model)
+        return jsonify(payload)
+    except BudgetExceeded as e:
+        return jsonify({"error": str(e), "kind": "budget_exceeded"}), 429
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.route("/api/outreach/pick_winner", methods=["POST"])
+def outreach_pick_winner_route():
+    from outreach.drafter import pick_winner
+    d = request.json or {}
+    try:
+        draft_id = int(d.get("draft_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "draft_id required (int)"}), 400
+    if not draft_id:
+        return jsonify({"error": "draft_id required"}), 400
+    return jsonify(pick_winner(draft_id))
+
+
+@app.route("/api/outreach/outcome", methods=["POST"])
+def outreach_outcome_route():
+    from outreach.drafter import set_outcome
+    d = request.json or {}
+    try:
+        draft_id = int(d.get("draft_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "draft_id required (int)"}), 400
+    if not draft_id:
+        return jsonify({"error": "draft_id required"}), 400
+    outcome = d.get("outcome")
+    notes = d.get("notes")
+    try:
+        return jsonify(set_outcome(draft_id, outcome, notes))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/outreach/drafts", methods=["GET"])
+def outreach_list_route():
+    from outreach.drafter import list_drafts
+    job_id = request.args.get("job_id", type=int)
+    if not job_id:
+        return jsonify({"error": "job_id required"}), 400
+    return jsonify({"drafts": list_drafts(job_id)})
+
+
+@app.route("/api/outreach/counts", methods=["GET"])
+def outreach_counts_route():
+    from outreach.drafter import draft_counts_by_job_url
+    return jsonify({"counts": draft_counts_by_job_url()})
+
+
+@app.route("/api/outreach/update", methods=["POST"])
+def outreach_update_route():
+    from outreach.drafter import update_draft
+    d = request.json or {}
+    try:
+        draft_id = int(d.get("draft_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "draft_id required (int)"}), 400
+    if not draft_id:
+        return jsonify({"error": "draft_id required"}), 400
+    try:
+        return jsonify(update_draft(
+            draft_id,
+            body=d.get("body"),
+            subject=d.get("subject"),
+            status=d.get("status"),
+        ))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/outreach/delete", methods=["POST"])
+def outreach_delete_route():
+    from outreach.drafter import delete_draft
+    d = request.json or {}
+    try:
+        draft_id = int(d.get("draft_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "draft_id required (int)"}), 400
+    if not draft_id:
+        return jsonify({"error": "draft_id required"}), 400
+    return jsonify(delete_draft(draft_id))
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

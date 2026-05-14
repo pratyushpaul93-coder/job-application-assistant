@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>pp-jobapp · design mockups</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { padding: var(--s-12) var(--s-6); }
+  .container { max-width: 720px; margin: 0 auto; }
+  .lede { margin-bottom: var(--s-10); }
+  .lede h1 { font-size: var(--fs-3xl); letter-spacing: -0.02em; margin-bottom: var(--s-3); }
+  .lede p { color: var(--c-text-2); font-size: var(--fs-md); line-height: 1.65; max-width: 56ch; }
+  .lede .badge { margin-right: var(--s-2); }
+  .toc {
+    display: flex; flex-direction: column; gap: var(--s-2);
+  }
+  .toc a {
+    display: flex; align-items: baseline;
+    padding: var(--s-4) var(--s-5);
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-1);
+    text-decoration: none;
+    transition: all var(--t-fast);
+  }
+  .toc a:hover { box-shadow: var(--sh-2); border-color: var(--c-border-strong); transform: translateY(-1px); }
+  .toc__num {
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    color: var(--c-text-3);
+    width: 28px;
+  }
+  .toc__body { flex: 1; }
+  .toc__title { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--c-text); }
+  .toc__sub   { font-size: var(--fs-sm); color: var(--c-text-2); margin-top: 2px; }
+  .toc__arrow { color: var(--c-text-3); font-size: 18px; line-height: 1; }
+  .toc a:hover .toc__arrow { color: var(--c-accent); }
+  .footnote { margin-top: var(--s-10); font-size: var(--fs-xs); color: var(--c-text-3); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="lede">
+    <div style="margin-bottom:var(--s-3)">
+      <span class="badge badge--accent">Mockup · v1</span>
+      <span class="badge badge--neutral">pp-jobapp</span>
+    </div>
+    <h1>Dashboard redesign</h1>
+    <p>Polished SaaS aesthetic — Linear/Vercel-leaning. Single indigo accent, generous whitespace, real funnel chart, full state coverage. Every screen consumes <code>tokens.css</code>; the live dashboard inlines the same tokens during the PR phases.</p>
+  </header>
+
+  <nav class="toc">
+    <a href="00-tokens-preview.html">
+      <span class="toc__num">00</span>
+      <span class="toc__body">
+        <div class="toc__title">Design tokens preview</div>
+        <div class="toc__sub">Swatches, type ramp, spacing scale, button-state grid, badges, inputs, skeletons.</div>
+      </span>
+      <span class="toc__arrow">→</span>
+    </a>
+    <a href="01-pipeline.html">
+      <span class="toc__num">01</span>
+      <span class="toc__body">
+        <div class="toc__title">Pipeline · funnel + KPIs</div>
+        <div class="toc__sub">Bespoke SVG-style horizontal funnel with stage deltas, KPI tiles, provider + top-companies tables.</div>
+      </span>
+      <span class="toc__arrow">→</span>
+    </a>
+    <a href="02-jobs-card.html">
+      <span class="toc__num">02</span>
+      <span class="toc__body">
+        <div class="toc__title">Job card · state matrix</div>
+        <div class="toc__sub">Default, selected, tailored, fit-set, review-panel open, loading skeleton.</div>
+      </span>
+      <span class="toc__arrow">→</span>
+    </a>
+    <a href="03-jobs-list.html">
+      <span class="toc__num">03</span>
+      <span class="toc__body">
+        <div class="toc__title">Matching jobs · full list view</div>
+        <div class="toc__sub">Stat bar, posted-date distribution, redesigned filters + sort, 5 cards in context, floating bulk bar.</div>
+      </span>
+      <span class="toc__arrow">→</span>
+    </a>
+    <a href="04-companies.html">
+      <span class="toc__num">04</span>
+      <span class="toc__body">
+        <div class="toc__title">Companies · table view</div>
+        <div class="toc__sub">Scan status bar, sortable table, ATS provider badges, empty + loading states.</div>
+      </span>
+      <span class="toc__arrow">→</span>
+    </a>
+    <a href="05-manual-tailor.html">
+      <span class="toc__num">05</span>
+      <span class="toc__body">
+        <div class="toc__title">Manual tailor · form + draft</div>
+        <div class="toc__sub">Side-by-side form and draft panel, model-pinned action labels, empty draft state.</div>
+      </span>
+      <span class="toc__arrow">→</span>
+    </a>
+    <a href="06-modal-add-company.html">
+      <span class="toc__num">06</span>
+      <span class="toc__body">
+        <div class="toc__title">Add company · modal state matrix</div>
+        <div class="toc__sub">Empty, detecting, detected ok, detected error (with manual fallback).</div>
+      </span>
+      <span class="toc__arrow">→</span>
+    </a>
+  </nav>
+
+  <p class="footnote">Open these files directly from disk (the design system uses <code>tokens.css</code> from the same folder). Tokens live in one place: edit <code>tokens.css</code> and every screen updates.</p>
+
+</div>
+</body>
+</html>
